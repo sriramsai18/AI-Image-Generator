@@ -1,0 +1,5 @@
+# Palette's Journal - Sriram's AI-Image-Generator
+
+## 2025-02-13 - Elevating Interactive Controls & Focus-Visible States in Dark Cyberpunk UIs
+**Learning:** Dark/cyberpunk high-fidelity user interfaces often style active states, neon glow borders, and shadow hover effects while completely neglecting focus-visible indicators. This creates high contrast for mouse users but makes keyboard navigation invisible. By using CSS `:focus-visible` with matching neon accent outlines (such as lime green `#39ff14` for primary actions and brand red `#e63946` for controls), keyboard focus indicators feel like an intentional part of the design system instead of default browser outlines. Additionally, providing an explicit, prominent "Reset to Defaults" button alongside primary generator actions improves workflow efficiency by saving users from having to reload the web page to revert changed settings.
+**Action:** Always inspect custom button component packages in Gradio/Python environments to verify their `:focus-visible` states, and pair primary generation buttons with a secondary "Reset" action to allow instantaneous form resetting.
