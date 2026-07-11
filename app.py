@@ -4,22 +4,30 @@ from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
 
+import os
+
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+# Detect if we should use mock mode (default to true on CPU to prevent out-of-memory or slow load)
+MOCK_MODE = os.environ.get("MOCK_MODE", "1") == "1" or not torch.cuda.is_available()
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+if MOCK_MODE:
+    print("Running in MOCK MODE (MOCK_MODE=1 or no GPU available) 🎨")
+    pipe = None
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
 
-print("Model loaded ✅")
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -32,17 +40,54 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        if MOCK_MODE:
+            # Generate a beautiful placeholder gradient/accent image
+            from PIL import ImageDraw
+            img = Image.new("RGB", (int(width), int(height)), color="#0d1117")
+            draw = ImageDraw.Draw(img)
+
+            # Draw a subtle high-contrast border
+            draw.rectangle([8, 8, int(width)-8, int(height)-8], outline="#e63946", width=2)
+
+            # Draw aesthetic futuristic grid lines
+            for i in range(4):
+                x = 8 + (int(width) - 16) * (i + 1) // 5
+                draw.line([x, 8, x, int(height)-8], fill="#1f1618", width=1)
+                y = 8 + (int(height) - 16) * (i + 1) // 5
+                draw.line([8, y, int(width)-8, y], fill="#1f1618", width=1)
+
+            # Simple decorative corner brackets
+            corner_len = 20
+            draw.line([8, 8, 8 + corner_len, 8], fill="#39ff14", width=3)
+            draw.line([8, 8, 8, 8 + corner_len], fill="#39ff14", width=3)
+            draw.line([int(width)-8, 8, int(width)-8 - corner_len, 8], fill="#39ff14", width=3)
+            draw.line([int(width)-8, 8, int(width)-8, 8 + corner_len], fill="#39ff14", width=3)
+            draw.line([8, int(height)-8, 8 + corner_len, int(height)-8], fill="#39ff14", width=3)
+            draw.line([8, int(height)-8, 8, int(height)-8 - corner_len], fill="#39ff14", width=3)
+            draw.line([int(width)-8, int(height)-8, int(width)-8 - corner_len, int(height)-8], fill="#39ff14", width=3)
+            draw.line([int(width)-8, int(height)-8, int(width)-8, int(height)-8 - corner_len], fill="#39ff14", width=3)
+
+            # Print details using standard font
+            draw.text((24, 24), "STABLE DIFFUSION v1.5", fill="#e63946")
+            draw.text((24, 54), f"PROMPT: {prompt[:40]}...", fill="#d4dde8")
+            draw.text((24, 84), f"NEGATIVE: {negative_prompt[:40]}...", fill="#8a9ab0")
+            draw.text((24, 114), f"SEED: {seed if seed != -1 else 'random'}", fill="#39ff14")
+            draw.text((24, 144), f"STEPS: {steps} | CFG: {guidance}", fill="#d4dde8")
+            draw.text((24, int(height) - 40), "[ MOCKED GENERATION ]", fill="#39ff14")
+            image = img
+        else:
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
+            image = result.images[0]
+
         elapsed = round(time.time() - start, 1)
-        image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
@@ -112,6 +157,23 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
+/* Keyboard Navigation & Accessibility Focus Indicators */
+button.primary:focus-visible {
+    outline: 3px solid #39ff14 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.8) !important;
+}
+button.secondary:focus-visible {
+    outline: 3px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 20px rgba(230, 57, 70, 0.8) !important;
+}
+textarea:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 1px !important;
+    border-color: #e63946 !important;
+}
+
 /* Generate button */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
@@ -128,6 +190,26 @@ button.primary {
 button.primary:hover {
     box-shadow: 0 0 35px rgba(230,57,70,0.6) !important;
     transform: translateY(-2px) !important;
+}
+
+/* Reset / Secondary button */
+button.secondary {
+    background: #0f1318 !important;
+    border: 1px solid rgba(230,57,70,0.3) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #8a9ab0 !important;
+    transition: all 0.3s !important;
+}
+button.secondary:hover {
+    background: #151a21 !important;
+    border-color: #e63946 !important;
+    color: #fff !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 0 15px rgba(230,57,70,0.2) !important;
 }
 
 /* Output image panel */
@@ -207,7 +289,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg", scale=2)
+                reset_btn = gr.Button("🔄 RESET", variant="secondary", size="lg", scale=1)
 
             gr.Examples(
                 examples=examples,
@@ -231,11 +315,29 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                 lines=1,
             )
 
+    def reset_all_fields():
+        return (
+            "",                                               # prompt
+            "blurry, ugly, distorted, low quality, watermark", # negative_prompt
+            25,                                               # steps
+            7.5,                                              # guidance
+            512,                                              # width
+            512,                                              # height
+            -1,                                               # seed
+            None,                                             # output_image
+            ""                                                # info_text
+        )
+
     # ── BIND ────────────────────────────────────────────────────────────────
     generate_btn.click(
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
         outputs=[output_image, info_text],
+    )
+    reset_btn.click(
+        fn=reset_all_fields,
+        inputs=[],
+        outputs=[prompt, negative_prompt, steps, guidance, width, height, seed, output_image, info_text],
     )
     prompt.submit(
         fn=generate_image,
@@ -254,4 +356,4 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
     """)
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", server_port=3000)
