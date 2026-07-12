@@ -1,0 +1,3 @@
+## 2026-07-12 - Cyberpunk Custom Themes Hide Default Focus Outlines
+**Learning:** In applications using dark/neon custom themes (like this sci-fi/cyberpunk Gradio app), default browser focus rings and standard component focus outlines are either completely invisible or visually blend into the dark background. This severely breaks accessibility for keyboard navigation.
+**Action:** Always explicitly define custom `:focus-visible` CSS rules on all interactive selectors (`button`, `input`, `textarea`, `a`) that utilize the theme's high-contrast accent color (e.g., `#e63946` red) and offset outlines so keyboard users have immediate and crystal-clear feedback on active elements.

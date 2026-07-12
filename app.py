@@ -1,25 +1,61 @@
+import os
+import random
 import gradio as gr
 import torch
-from diffusers import StableDiffusionPipeline
-from PIL import Image
+from PIL import Image, ImageDraw
 import time
 
+MOCK_MODE = os.environ.get("MOCK_MODE") == "1"
+
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if MOCK_MODE:
+    print("Running in MOCK_MODE (offline, lightweight mockup)...")
+    class MockPipeline:
+        def to(self, device):
+            return self
+        def enable_attention_slicing(self):
+            pass
+        def __call__(self, prompt, negative_prompt, num_inference_steps, guidance_scale, width, height, generator=None):
+            img = Image.new("RGB", (int(width), int(height)), color="#0f1318")
+            draw = ImageDraw.Draw(img)
+            # draw a cool techno border
+            draw.rectangle([10, 10, int(width) - 10, int(height) - 10], outline="#e63946", width=2)
+            # draw neon accents
+            draw.rectangle([15, 15, int(width) - 15, int(height) - 15], outline="#1c2331", width=1)
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+            # draw a cute glowing sun or sphere representing AI generation
+            cx, cy = int(width) // 2, int(height) // 2
+            draw.ellipse([cx - 50, cy - 50, cx + 50, cy + 50], fill="#e63946")
+            draw.ellipse([cx - 30, cy - 30, cx + 30, cy + 30], fill="#0f1318")
+            draw.ellipse([cx - 10, cy - 10, cx + 10, cy + 10], fill="#39ff14")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+            # add mock prompt text to make it customized
+            truncated_prompt = prompt[:40] + "..." if len(prompt) > 40 else prompt
+            text = f"MOCK: {truncated_prompt}"
+            draw.text((30, int(height) - 40), text, fill="#ffffff")
 
-print("Model loaded ✅")
+            class MockResult:
+                images = [img]
+            return MockResult()
+    pipe = MockPipeline()
+    print("Mock model loaded ✅")
+else:
+    from diffusers import StableDiffusionPipeline
+    print("Loading Stable Diffusion v1.5...")
+
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
+
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -56,6 +92,18 @@ examples = [
     ["a majestic snow-capped mountain reflected in a crystal clear lake, hyperrealistic", "cartoon, painting", 25, 7.5, 512, 512, -1],
     ["portrait of an astronaut on Mars, dramatic lighting, photorealistic", "ugly, deformed", 28, 7.5, 512, 512, -1],
     ["a cozy cafe interior with warm lighting and coffee cups, aesthetic", "blurry, dark", 25, 7.0, 512, 512, -1],
+]
+
+SURPRISE_PROMPTS = [
+    "a lone tree in a golden wheat field at sunset, dramatic lighting, 4k",
+    "a futuristic cyberpunk city at night, neon lights, rain, cinematic",
+    "a majestic snow-capped mountain reflected in a crystal clear lake, hyperrealistic",
+    "portrait of an astronaut on Mars, dramatic lighting, photorealistic",
+    "a cozy cafe interior with warm lighting and coffee cups, aesthetic",
+    "an enchanted forest with glowing mushrooms, magical pathway, highly detailed fantasy",
+    "a steampunk airship sailing through dramatic clouds at dawn, retro-futuristic style",
+    "a cute red panda wearing a tiny wizard hat reading a spell book, 3D render, Pixar style",
+    "underwater city with bioluminescent structures and colorful sea life, digital art"
 ]
 
 # ─── CUSTOM CSS ───────────────────────────────────────────────────────────────
@@ -149,6 +197,31 @@ input[type="range"] { accent-color: #e63946 !important; }
     border-color: rgba(57,255,20,0.2) !important;
 }
 
+/* Secondary buttons styling */
+.secondary-btn {
+    background: #10141a !important;
+    border: 1px solid rgba(230, 57, 70, 0.4) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.75rem !important;
+    letter-spacing: 1px !important;
+    text-transform: uppercase !important;
+    color: #e63946 !important;
+    transition: all 0.3s !important;
+}
+.secondary-btn:hover {
+    background: rgba(230, 57, 70, 0.15) !important;
+    box-shadow: 0 0 15px rgba(230, 57, 70, 0.3) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Accessibility focus indicator styling */
+button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 12px rgba(230, 57, 70, 0.6) !important;
+}
+
 /* Accordion / panels */
 .gr-box, .gr-panel {
     background: #0f1318 !important;
@@ -191,6 +264,11 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                 placeholder="describe what you want to generate...",
                 lines=3,
             )
+
+            with gr.Row():
+                surprise_btn = gr.Button("🎲 SURPRISE ME", elem_classes=["secondary-btn"])
+                clear_btn = gr.Button("🗑️ CLEAR PROMPT", elem_classes=["secondary-btn"])
+
             negative_prompt = gr.Textbox(
                 label="NEGATIVE PROMPT  (what to avoid)",
                 placeholder="blurry, ugly, low quality, distorted...",
@@ -232,6 +310,17 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
             )
 
     # ── BIND ────────────────────────────────────────────────────────────────
+    surprise_btn.click(
+        fn=lambda: random.choice(SURPRISE_PROMPTS),
+        inputs=None,
+        outputs=prompt,
+    )
+    clear_btn.click(
+        fn=lambda: "",
+        inputs=None,
+        outputs=prompt,
+    )
+
     generate_btn.click(
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
