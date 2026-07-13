@@ -1,0 +1,3 @@
+## 2026-07-13 - [Ensuring Keyboard Focus Visibility on Dark/Neon Themes]
+**Learning:** Custom dark/neon themes in applications (specifically built with Gradio/CSS frameworks) often suppress or blend out the browser's default keyboard focus indicators (`:focus-visible`). Declaring an explicit, high-contrast `:focus-visible` outline in custom CSS guarantees keyboard accessibility across standard interactive elements (buttons, inputs, textareas, links, sliders) without disrupting the intended aesthetic.
+**Action:** Always include a dedicated, brand-aligned but high-contrast `:focus-visible` focus ring override when styling custom dark/neon stylesheets for Gradio or raw CSS frontends.

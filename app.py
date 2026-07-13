@@ -1,37 +1,56 @@
+import os
 import gradio as gr
 import torch
-from diffusers import StableDiffusionPipeline
-from PIL import Image
+from PIL import Image, ImageDraw
 import time
 
+MOCK_MODE = os.environ.get('MOCK_MODE') == '1'
+
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if MOCK_MODE:
+    print("MOCK_MODE is enabled. Skipping Stable Diffusion model load.")
+    pipe = None
+else:
+    from diffusers import StableDiffusionPipeline
+    print("Loading Stable Diffusion v1.5...")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
 
-print("Model loaded ✅")
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
     if not prompt.strip():
         return None, "⚠️ Please enter a prompt first!"
 
-    generator = None
-    if seed != -1:
-        generator = torch.Generator().manual_seed(int(seed))
-
     try:
         start = time.time()
+        if MOCK_MODE:
+            w, h = int(width), int(height)
+            image = Image.new("RGB", (w, h), color="#0f1318")
+            draw = ImageDraw.Draw(image)
+            draw.rectangle([20, 20, w - 20, h - 20], outline="#e63946", width=2)
+            # Simple text rendering line if default font can handle it or just shape representation
+            draw.line([20, 20, w - 20, h - 20], fill="rgba(230,57,70,0.2)", width=2)
+            draw.line([20, h - 20, w - 20, 20], fill="rgba(230,57,70,0.2)", width=2)
+            elapsed = round(time.time() - start, 1)
+            info  = f"✅ Generated (Mock Mode) in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
+            return image, info
+
+        generator = None
+        if seed != -1:
+            generator = torch.Generator().manual_seed(int(seed))
+
         result = pipe(
             prompt=prompt,
             negative_prompt=negative_prompt if negative_prompt.strip() else None,
@@ -110,6 +129,17 @@ textarea, input[type="text"], input[type="number"] {
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* High-contrast focus-visible styles for keyboard accessibility */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+input[type="range"]:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 12px rgba(230, 57, 70, 0.6) !important;
 }
 
 /* Generate button */
