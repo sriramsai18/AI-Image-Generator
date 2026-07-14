@@ -3,21 +3,80 @@ import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
+import os
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
 print("Loading Stable Diffusion v1.5...")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+MOCK_MODE = os.environ.get("MOCK_MODE", "0") == "1"
+
+if MOCK_MODE:
+    print("Running in MOCK_MODE: Using a lightweight, offline mockup of the generation pipeline.")
+    class MockResult:
+        def __init__(self, images):
+            self.images = images
+
+    class MockPipeline:
+        def __init__(self):
+            class MockModule:
+                def to(self, memory_format):
+                    pass
+            self.unet = MockModule()
+            self.vae = MockModule()
+
+        def to(self, device):
+            return self
+
+        def enable_attention_slicing(self):
+            pass
+
+        def __call__(self, prompt, negative_prompt=None, num_inference_steps=25, guidance_scale=7.5, width=512, height=512, generator=None):
+            # Return a structured PIL canvas for testing
+            from PIL import Image, ImageDraw
+            img = Image.new("RGB", (width, height), color=(20, 24, 30))
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([20, 20, width - 20, height - 20], outline=(230, 57, 70), width=3)
+            try:
+                draw.text((40, 40), f"Mock Image: {prompt[:30]}...", fill=(255, 255, 255))
+                draw.text((40, 70), f"Steps: {num_inference_steps} | CFG: {guidance_scale}", fill=(255, 255, 255))
+            except Exception:
+                pass
+            return MockResult([img])
+
+    pipe = MockPipeline()
+else:
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+# Optimize memory layout for UNet and VAE layers (channels_last)
+# This reduces inference time and memory consumption for PyTorch models
+try:
+    if hasattr(pipe, "unet") and pipe.unet is not None:
+        pipe.unet.to(memory_format=torch.channels_last)
+    if hasattr(pipe, "vae") and pipe.vae is not None:
+        pipe.vae.to(memory_format=torch.channels_last)
+except Exception as e:
+    print(f"Warning: Could not apply memory format channels_last: {e}")
 
 # speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+# enable_attention_slicing introduces severe CPU overhead (up to ~230% slowdown)
+# and should be avoided on CPU unless RAM is extremely constrained (<4GB).
+if not torch.cuda.is_available() and not MOCK_MODE:
+    try:
+        total_ram = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+    except (ValueError, AttributeError, OSError):
+        total_ram = 8 * (1024**3) # default fallback to 8GB
+
+    if total_ram < 4 * (1024**3):
+        print("System RAM is constrained (<4GB). Enabling attention slicing.")
+        pipe.enable_attention_slicing()
+    else:
+        print("System RAM is sufficient (>=4GB). Skipping attention slicing to avoid CPU overhead.")
 
 print("Model loaded ✅")
 
@@ -32,15 +91,17 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # Use torch.inference_mode() to speed up forward passes and reduce memory usage
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
