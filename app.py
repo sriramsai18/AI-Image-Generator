@@ -1,3 +1,4 @@
+import os
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
@@ -5,19 +6,41 @@ from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if os.environ.get("MOCK_MODE") == "1":
+    print("Loading MOCK Stable Diffusion v1.5 (Offline Mode)...")
+    class MockPipeline:
+        def to(self, device):
+            return self
+        def enable_attention_slicing(self):
+            pass
+        def __call__(self, prompt, negative_prompt=None, num_inference_steps=25, guidance_scale=7.5, width=512, height=512, generator=None):
+            from PIL import ImageDraw
+            image = Image.new("RGB", (width, height), color=(15, 19, 24))
+            draw = ImageDraw.Draw(image)
+            draw.rectangle([int(width * 0.15), int(height * 0.15), int(width * 0.85), int(height * 0.85)], outline=(230, 57, 70), width=3)
+            # Add text
+            try:
+                draw.text((int(width * 0.2), int(height * 0.45)), f"MOCK: {prompt[:30]}...", fill=(255, 255, 255))
+            except Exception:
+                pass
+            class MockResult:
+                def __init__(self, images):
+                    self.images = images
+            return MockResult([image])
+    pipe = MockPipeline()
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
-
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
 
 print("Model loaded ✅")
 
@@ -110,6 +133,12 @@ textarea, input[type="text"], input[type="number"] {
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* High-contrast focus-visible styles for keyboard accessibility */
+button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
 }
 
 /* Generate button */
@@ -207,7 +236,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+                reset_btn = gr.Button("🧹 RESET ALL", variant="secondary", size="lg")
 
             gr.Examples(
                 examples=examples,
@@ -236,6 +267,25 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
         outputs=[output_image, info_text],
+    )
+
+    def reset_all_fields():
+        return (
+            "",                                              # prompt
+            "blurry, ugly, distorted, low quality, watermark", # negative_prompt
+            25,                                              # steps
+            7.5,                                             # guidance
+            512,                                             # width
+            512,                                             # height
+            -1,                                              # seed
+            None,                                            # output_image
+            "🧹 Form reset to default values."               # info_text
+        )
+
+    reset_btn.click(
+        fn=reset_all_fields,
+        inputs=[],
+        outputs=[prompt, negative_prompt, steps, guidance, width, height, seed, output_image, info_text]
     )
     prompt.submit(
         fn=generate_image,
