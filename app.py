@@ -3,23 +3,29 @@ import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
+import os
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+MOCK_MODE = os.environ.get("MOCK_MODE") == "1"
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+if MOCK_MODE:
+    print("Running in MOCK_MODE: Stable Diffusion pipeline mocked! 🎨")
+    pipe = None
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
 
-print("Model loaded ✅")
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -32,17 +38,41 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        if MOCK_MODE:
+            # Generate a gorgeous retro-futuristic grid/cyber placeholder canvas
+            time.sleep(0.5)  # slight delay for realism
+            image = Image.new("RGB", (int(width), int(height)), color="#080b0f")
+            from PIL import ImageDraw
+            draw = ImageDraw.Draw(image)
+            # Draw cybergrid layout
+            w, h = int(width), int(height)
+            # draw grid lines
+            for i in range(0, w, 40):
+                draw.line([(i, 0), (i, h)], fill="#1f1a24", width=1)
+            for j in range(0, h, 40):
+                draw.line([(0, j), (w, j)], fill="#1f1a24", width=1)
+            # draw neon border
+            draw.rectangle([10, 10, w - 10, h - 10], outline="#e63946", width=2)
+            draw.rectangle([20, 20, w - 20, h - 20], outline="#39ff14", width=1)
+            # draw neon crosses in corners
+            for x, y in [(30, 30), (w - 30, 30), (30, h - 30), (w - 30, h - 30)]:
+                draw.line([(x - 10, y), (x + 10, y)], fill="#e63946", width=2)
+                draw.line([(x, y - 10), (x, y + 10)], fill="#e63946", width=2)
+            # Draw HUD status text
+            hud_text = f"// SYSTEM STATUS: OPERATIONAL\n// SIZE: {w}x{h}\n// SEED: {seed if seed != -1 else 'random'}\n// PROMPT: {prompt[:40]}..."
+            draw.text((40, 40), hud_text, fill="#39ff14")
+        else:
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
+            image = result.images[0]
         elapsed = round(time.time() - start, 1)
-        image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
@@ -130,6 +160,24 @@ button.primary:hover {
     transform: translateY(-2px) !important;
 }
 
+button.secondary {
+    background: #0f1318 !important;
+    border: 1px solid rgba(230,57,70,0.4) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #e63946 !important;
+    box-shadow: 0 0 10px rgba(230,57,70,0.1) !important;
+    transition: all 0.3s !important;
+}
+button.secondary:hover {
+    background: rgba(230,57,70,0.1) !important;
+    box-shadow: 0 0 20px rgba(230,57,70,0.3) !important;
+    transform: translateY(-2px) !important;
+}
+
 /* Output image panel */
 .output-image {
     border: 1px solid rgba(230,57,70,0.2) !important;
@@ -169,6 +217,13 @@ input[type="range"] { accent-color: #e63946 !important; }
 }
 .app-footer a { color: #e63946; text-decoration: none; }
 .app-footer a:hover { text-decoration: underline; }
+
+/* High-contrast focus indicator for keyboard accessibility */
+button:focus-visible, a:focus-visible, input[type="range"]:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex="0"]:focus-visible {
+    outline: 2px solid #39ff14 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 15px rgba(57, 255, 20, 0.6) !important;
+}
 """
 
 # ─── GRADIO UI ────────────────────────────────────────────────────────────────
@@ -207,7 +262,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+                clear_btn = gr.Button("🧹 CLEAR", variant="secondary", size="lg")
 
             gr.Examples(
                 examples=examples,
@@ -236,6 +293,10 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
         outputs=[output_image, info_text],
+    )
+    clear_btn.click(
+        fn=lambda: ("", None, ""),
+        outputs=[prompt, output_image, info_text],
     )
     prompt.submit(
         fn=generate_image,
