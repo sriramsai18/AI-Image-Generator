@@ -1,25 +1,58 @@
+import os
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
+from PIL import Image, ImageDraw
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+MOCK_MODE = os.getenv("MOCK_MODE") == "1"
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+if MOCK_MODE:
+    print("MOCK_MODE is enabled. Loading lightweight offline mockup...")
+    class MockPipeline:
+        def to(self, device):
+            return self
+        def enable_attention_slicing(self):
+            pass
+        def __call__(self, prompt, negative_prompt, num_inference_steps, guidance_scale, width, height, generator):
+            img = Image.new("RGB", (width, height), color="#0f1318")
+            draw = ImageDraw.Draw(img)
+            # Draw a nice mockup visual (a cyber-themed frame and some generated text/info)
+            draw.rectangle([10, 10, width-10, height-10], outline="#e63946", width=2)
+            draw.line([10, 50, width-10, 50], fill="#e63946", width=1)
+            draw.text((20, 20), "AI GENERATED MOCKUP IMAGE", fill="#e63946")
+            draw.text((20, 70), f"Prompt: {prompt[:40]}...", fill="#d4dde8")
+            if negative_prompt:
+                draw.text((20, 95), f"Negative: {negative_prompt[:40]}...", fill="#8a9ab0")
+            draw.text((20, 120), f"Steps: {num_inference_steps} | CFG: {guidance_scale}", fill="#8a9ab0")
+            seed_val = generator.initial_seed() if generator else "random"
+            draw.text((20, 145), f"Seed: {seed_val}", fill="#8a9ab0")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+            # Draw some random shapes to make it look generated and cool
+            draw.rectangle([50, 180, width-50, height-50], outline="#39ff14", width=1)
+            draw.text((width//2 - 50, height//2), "[ Generated Art ]", fill="#39ff14")
 
-print("Model loaded ✅")
+            class MockResult:
+                images = [img]
+            return MockResult()
+    pipe = MockPipeline()
+    print("Mock model loaded ✅")
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
+
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -169,6 +202,18 @@ input[type="range"] { accent-color: #e63946 !important; }
 }
 .app-footer a { color: #e63946; text-decoration: none; }
 .app-footer a:hover { text-decoration: underline; }
+
+/* Accessibility Focus Indicators for Keyboard Navigation */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+input[type="range"]:focus-visible,
+.gr-button:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 10px rgba(230, 57, 70, 0.8) !important;
+}
 """
 
 # ─── GRADIO UI ────────────────────────────────────────────────────────────────
@@ -254,4 +299,6 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
     """)
 
 if __name__ == "__main__":
-    demo.launch()
+    server_name = os.getenv("GRADIO_SERVER_NAME", "127.0.0.1")
+    server_port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+    demo.launch(server_name=server_name, server_port=server_port)
