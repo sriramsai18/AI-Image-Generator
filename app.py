@@ -3,23 +3,48 @@ import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
+import os
+
+# Check for mock mode
+MOCK_MODE = os.environ.get("MOCK_MODE") == "1"
+
+def get_system_ram_gb():
+    try:
+        total_bytes = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+        return total_bytes / (1024 ** 3)
+    except Exception:
+        # Default fallback (safely assume 8GB to avoid enabling attention slicing unnecessarily)
+        return 8.0
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if MOCK_MODE:
+    print("Running in MOCK MODE (offline mockup)... ✅")
+    pipe = None
+else:
+    print("Loading Stable Diffusion v1.5...")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    # Optimization: Channels-last memory format on UNet and VAE layers speeds up convolutions significantly
+    if hasattr(pipe, "unet") and pipe.unet is not None:
+        pipe.unet.to(memory_format=torch.channels_last)
+    if hasattr(pipe, "vae") and pipe.vae is not None:
+        pipe.vae.to(memory_format=torch.channels_last)
 
-print("Model loaded ✅")
+    # Optimization: Avoid attention slicing on CPU unless RAM is extremely constrained (<4GB)
+    # as it introduces severe CPU overhead (~230% slowdown)
+    if not torch.cuda.is_available():
+        ram_gb = get_system_ram_gb()
+        if ram_gb < 4.0:
+            pipe.enable_attention_slicing()
+
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -32,17 +57,33 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
-        elapsed = round(time.time() - start, 1)
-        image = result.images[0]
+        if MOCK_MODE:
+            # Create a structured PIL canvas with neon border and text
+            from PIL import ImageDraw
+            image = Image.new("RGB", (int(width), int(height)), color=(15, 19, 24))
+            draw = ImageDraw.Draw(image)
+            # Draw neon cyberpunk border
+            draw.rectangle([10, 10, int(width)-10, int(height)-10], outline=(230, 57, 70), width=3)
+            # Draw mockup status text
+            text = f"MOCK IMAGE\nPrompt: {prompt[:30]}..."
+            draw.text((20, 20), text, fill=(212, 221, 232))
+            time.sleep(0.05) # Simulate a tiny generation delay
+            elapsed = round(time.time() - start, 1)
+        else:
+            # Optimization: Wrap inference with torch.inference_mode() to bypass autograd and speed up generation
+            with torch.inference_mode():
+                result = pipe(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                    num_inference_steps=int(steps),
+                    guidance_scale=float(guidance),
+                    width=int(width),
+                    height=int(height),
+                    generator=generator,
+                )
+            elapsed = round(time.time() - start, 1)
+            image = result.images[0]
+
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
