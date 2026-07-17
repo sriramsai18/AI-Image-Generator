@@ -4,20 +4,36 @@ from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
 
+import os
+
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+MOCK_MODE = os.getenv("MOCK_MODE") == "1"
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+if MOCK_MODE:
+    print("MOCK_MODE is enabled. Using a dummy pipeline mockup...")
+    class DummyPipeline:
+        def to(self, device):
+            return self
+        def enable_attention_slicing(self):
+            pass
+        def __call__(self, prompt, negative_prompt, num_inference_steps, guidance_scale, width, height, generator=None):
+            class DummyResult:
+                images = [Image.new("RGB", (width, height), color=(230, 57, 70))]
+            return DummyResult()
+    pipe = DummyPipeline()
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
 
 print("Model loaded ✅")
 
@@ -48,6 +64,10 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     except Exception as e:
         return None, f"❌ Error: {str(e)}"
+
+# ─── RESET FUNCTION ───────────────────────────────────────────────────────────
+def reset_inputs():
+    return "", "blurry, ugly, distorted, low quality, watermark", 25, 7.5, 512, 512, -1
 
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
@@ -112,6 +132,13 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
+/* Accessibility: High-contrast focus indicators */
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, [role="button"]:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 0 4px rgba(230,57,70,0.4) !important;
+}
+
 /* Generate button */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
@@ -127,6 +154,23 @@ button.primary {
 }
 button.primary:hover {
     box-shadow: 0 0 35px rgba(230,57,70,0.6) !important;
+    transform: translateY(-2px) !important;
+}
+
+button.secondary {
+    background: #0f1318 !important;
+    border: 1px solid rgba(230,57,70,0.4) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #e63946 !important;
+    transition: all 0.3s !important;
+}
+button.secondary:hover {
+    background: rgba(230,57,70,0.1) !important;
+    box-shadow: 0 0 15px rgba(230,57,70,0.25) !important;
     transform: translateY(-2px) !important;
 }
 
@@ -207,7 +251,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                reset_btn = gr.Button("🧹 RESET", variant="secondary", size="lg")
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
 
             gr.Examples(
                 examples=examples,
@@ -232,6 +278,11 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
             )
 
     # ── BIND ────────────────────────────────────────────────────────────────
+    reset_btn.click(
+        fn=reset_inputs,
+        inputs=[],
+        outputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
+    )
     generate_btn.click(
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
