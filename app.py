@@ -1,27 +1,76 @@
+import os
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
 
+class DummyModule:
+    def to(self, *args, **kwargs):
+        return self
+
+class MockPipelineOutput:
+    def __init__(self, images):
+        self.images = images
+
+class MockPipeline:
+    def __init__(self):
+        self.unet = DummyModule()
+        self.vae = DummyModule()
+
+    def __call__(self, prompt, negative_prompt=None, num_inference_steps=25, guidance_scale=7.5, width=512, height=512, generator=None):
+        from PIL import ImageDraw
+        # Ensure dimensions are positive integers and within reasonable bounds
+        w = max(64, int(width))
+        h = max(64, int(height))
+        img = Image.new("RGB", (w, h), color=(15, 19, 24))
+        draw = ImageDraw.Draw(img)
+        draw.text((20, 20), f"MOCK GENERATION\nPrompt: {prompt[:40]}", fill=(230, 57, 70))
+        return MockPipelineOutput([img])
+
+    def to(self, device):
+        return self
+
+    def enable_attention_slicing(self):
+        pass
+
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if os.environ.get("MOCK_MODE") == "1":
+    print("Loading Mock Pipeline (offline test mode)...")
+    pipe = MockPipeline()
+    print("Mock Pipeline loaded ✅")
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    # speed optimisation for CPU: attention slicing causes severe CPU overhead and is only enabled when RAM < 4GB
+    if not torch.cuda.is_available():
+        try:
+            total_ram = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+        except Exception:
+            total_ram = 8 * (1024 ** 3)  # default fallback to 8GB if sysconf fails
+        if total_ram < 4 * (1024 ** 3):
+            pipe.enable_attention_slicing()
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    print("Model loaded ✅")
 
-print("Model loaded ✅")
+# Apply channels_last memory format to UNet and VAE layers for optimized convolutions
+try:
+    if hasattr(pipe, "unet") and pipe.unet is not None:
+        pipe.unet.to(memory_format=torch.channels_last)
+    if hasattr(pipe, "vae") and pipe.vae is not None:
+        pipe.vae.to(memory_format=torch.channels_last)
+except Exception as e:
+    print(f"Warning: Could not apply channels_last memory layout: {e}")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
+@torch.inference_mode()
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
     if not prompt.strip():
         return None, "⚠️ Please enter a prompt first!"
