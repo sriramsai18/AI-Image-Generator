@@ -4,20 +4,42 @@ from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
 
+import os
+
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
 print("Loading Stable Diffusion v1.5...")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+MOCK_MODE = os.getenv("MOCK_MODE", "0") == "1"
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+if MOCK_MODE:
+    print("MOCK_MODE is enabled. Creating mockup pipeline...")
+    class MockPipeline:
+        def to(self, device):
+            return self
+        def enable_attention_slicing(self):
+            pass
+        def __call__(self, prompt, negative_prompt, num_inference_steps, guidance_scale, width, height, generator=None):
+            from PIL import Image, ImageDraw
+            img = Image.new("RGB", (width, height), color="#0f1318")
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([10, 10, width-10, height-10], outline="#e63946", width=2)
+            draw.text((30, 30), f"Cyberpunk Mockup\nPrompt: {prompt}", fill="#e63946")
+            class MockResult:
+                images = [img]
+            return MockResult()
+    pipe = MockPipeline()
+else:
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
 
 print("Model loaded ✅")
 
@@ -130,6 +152,31 @@ button.primary:hover {
     transform: translateY(-2px) !important;
 }
 
+/* Secondary Button (Reset) */
+button.secondary {
+    background: #0f1318 !important;
+    border: 1px solid rgba(230,57,70,0.4) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #e63946 !important;
+    transition: all 0.3s !important;
+}
+button.secondary:hover {
+    background: rgba(230,57,70,0.1) !important;
+    box-shadow: 0 0 15px rgba(230,57,70,0.3) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* High-contrast Keyboard Accessibility Focus Indicators */
+button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible, select:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 12px rgba(230,57,70,0.6) !important;
+}
+
 /* Output image panel */
 .output-image {
     border: 1px solid rgba(230,57,70,0.2) !important;
@@ -207,7 +254,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", scale=3)
+                reset_btn = gr.Button("↺ RESET DEFAULTS", variant="secondary", scale=1)
 
             gr.Examples(
                 examples=examples,
@@ -241,6 +290,25 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
         outputs=[output_image, info_text],
+    )
+
+    def reset_inputs():
+        return (
+            "",  # prompt
+            "blurry, ugly, distorted, low quality, watermark",  # negative_prompt
+            25,  # steps
+            7.5,  # guidance
+            512,  # width
+            512,  # height
+            -1,  # seed
+            None,  # output_image
+            "↺ Defaults restored. Ready for your prompt!"  # info_text
+        )
+
+    reset_btn.click(
+        fn=reset_inputs,
+        inputs=[],
+        outputs=[prompt, negative_prompt, steps, guidance, width, height, seed, output_image, info_text],
     )
 
     gr.HTML("""
