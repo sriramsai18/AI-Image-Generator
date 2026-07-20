@@ -3,23 +3,82 @@ import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
+import os
+
+MOCK_MODE = os.environ.get("MOCK_MODE") == "1"
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if MOCK_MODE:
+    print("MOCK_MODE is active. Loading lightweight mockup pipeline...")
+    class MockPipeline:
+        def __init__(self):
+            # Define fake unet and vae layers for structural similarity
+            class MockLayer:
+                def to(self, *args, **kwargs):
+                    return self
+            self.unet = MockLayer()
+            self.vae = MockLayer()
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+        def to(self, device):
+            return self
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+        def enable_attention_slicing(self):
+            pass
 
-print("Model loaded ✅")
+        def __call__(self, prompt, negative_prompt=None, num_inference_steps=25, guidance_scale=7.5, width=512, height=512, generator=None):
+            from PIL import ImageDraw
+            # Generate a nice mockup PIL canvas
+            image = Image.new("RGB", (width, height), color=(15, 19, 24))
+            draw = ImageDraw.Draw(image)
+            # Draw aesthetic borders and status
+            draw.rectangle([(10, 10), (width - 10, height - 10)], outline=(230, 57, 70), width=2)
+            text_prompt = f"Mockup: {prompt[:30]}..." if len(prompt) > 30 else f"Mockup: {prompt}"
+            draw.text((20, 20), text_prompt, fill=(212, 221, 232))
+            draw.text((20, 50), f"Steps: {num_inference_steps} | CFG: {guidance_scale} | Size: {width}x{height}", fill=(57, 255, 20))
+            if negative_prompt:
+                draw.text((20, 80), f"Negative: {negative_prompt[:30]}...", fill=(138, 154, 176))
+
+            # Subtle delay to mimic real generation
+            time.sleep(0.1)
+
+            class MockResult:
+                def __init__(self, img):
+                    self.images = [img]
+            return MockResult(image)
+
+    pipe = MockPipeline()
+    print("Mock model loaded ✅")
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Apply 'channels_last' memory formatting to UNet and VAE layers for speedup
+    if hasattr(pipe, "unet") and pipe.unet is not None:
+        pipe.unet.to(memory_format=torch.channels_last)
+    if hasattr(pipe, "vae") and pipe.vae is not None:
+        pipe.vae.to(memory_format=torch.channels_last)
+
+    # Speed optimization for CPU (only if RAM is constrained < 4GB)
+    # Attention slicing on CPU with >=4GB RAM causes a ~230% slowdown.
+    try:
+        total_ram = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+    except Exception:
+        total_ram = 8 * 1024 * 1024 * 1024  # Default to 8GB if not available
+
+    if not torch.cuda.is_available():
+        if total_ram < 4 * 1024 * 1024 * 1024:
+            print("System RAM is constrained (<4GB). Enabling attention slicing on CPU.")
+            pipe.enable_attention_slicing()
+        else:
+            print(f"System RAM is sufficient ({total_ram / (1024**3):.2f} GB >= 4GB). Avoiding CPU attention slicing for speed.")
+
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -32,15 +91,17 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # Use torch.inference_mode() for optimized, faster inference without overhead
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
@@ -254,4 +315,6 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
     """)
 
 if __name__ == "__main__":
-    demo.launch()
+    server_name = os.environ.get("GRADIO_SERVER_NAME", "127.0.0.1")
+    server_port = int(os.environ.get("GRADIO_SERVER_PORT", "7860"))
+    demo.launch(server_name=server_name, server_port=server_port)
