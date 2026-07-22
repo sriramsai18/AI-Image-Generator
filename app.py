@@ -4,20 +4,72 @@ from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
 
+import os
+
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+MOCK_MODE = os.getenv("MOCK_MODE", "0") == "1"
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+if MOCK_MODE:
+    print("Running in MOCK MODE (lightweight offline mockup) ⚡")
+    class MockPipeline:
+        def __init__(self):
+            class MockLayer:
+                def to(self, *args, **kwargs):
+                    return self
+            self.unet = MockLayer()
+            self.vae = MockLayer()
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+        def to(self, *args, **kwargs):
+            return self
+
+        def enable_attention_slicing(self):
+            pass
+
+        def disable_attention_slicing(self):
+            pass
+
+        def __call__(self, prompt, negative_prompt=None, num_inference_steps=25, guidance_scale=7.5, width=512, height=512, generator=None):
+            from PIL import Image, ImageDraw
+            img = Image.new("RGB", (width, height), color=(15, 19, 24))
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([20, 20, width - 20, height - 20], outline="#e63946", width=2)
+            draw.text((40, 40), "MOCK GENERATION ⚡", fill="#ffffff")
+            draw.text((40, 70), f"Prompt: {prompt[:40]}...", fill="#8a9ab0")
+            draw.text((40, 100), f"Steps: {num_inference_steps} | CFG: {guidance_scale}", fill="#e63946")
+
+            class MockResult:
+                def __init__(self, images):
+                    self.images = images
+            return MockResult([img])
+
+    pipe = MockPipeline()
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+# speed and throughput optimisations for Stable Diffusion inference
+if not MOCK_MODE:
+    # 1. Format UNet and VAE layers to use channels_last memory layout (better throughput)
+    pipe.unet.to(memory_format=torch.channels_last)
+    if hasattr(pipe, "vae") and pipe.vae is not None:
+        pipe.vae.to(memory_format=torch.channels_last)
+
+    # 2. Avoid attention slicing overhead on CPU unless RAM is extremely constrained (< 4GB)
+    if not torch.cuda.is_available():
+        try:
+            total_ram = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+        except Exception:
+            total_ram = 0
+        if 0 < total_ram < 4 * 1024**3:
+            pipe.enable_attention_slicing()
+        else:
+            pipe.disable_attention_slicing()
 
 print("Model loaded ✅")
 
@@ -32,15 +84,17 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # 3. Wrapping inference in torch.inference_mode() disables gradient tracking, boosting speed
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
