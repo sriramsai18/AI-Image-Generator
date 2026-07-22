@@ -140,6 +140,17 @@ button.primary:hover {
 /* Sliders */
 input[type="range"] { accent-color: #e63946 !important; }
 
+/* Keyboard accessibility focus indicators for focus-visible elements */
+button:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+    outline: 3px solid #39ff14 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 15px rgba(57, 255, 20, 0.6) !important;
+}
+
 /* Info textbox */
 .info-box textarea {
     font-family: 'Share Tech Mono', monospace !important;
