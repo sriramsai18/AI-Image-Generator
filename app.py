@@ -3,28 +3,49 @@ import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
+import os
+
+# ─── MOCK MODE FOR OFFLINE / TEST RUNS ────────────────────────────────────────
+MOCK_MODE = os.getenv("MOCK_MODE", "0") == "1"
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if MOCK_MODE:
+    print("Running in MOCK_MODE (offline/mock generation) ✅")
+    pipe = None
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
-
-print("Model loaded ✅")
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
     if not prompt.strip():
         return None, "⚠️ Please enter a prompt first!"
+
+    if MOCK_MODE:
+        try:
+            start = time.time()
+            from PIL import ImageDraw
+            image = Image.new("RGB", (int(width), int(height)), color="#0f1318")
+            draw = ImageDraw.Draw(image)
+            draw.rectangle([20, 20, int(width)-20, int(height)-20], outline="#e63946", width=3)
+            draw.text((40, 40), f"Mock Generation\n\nPrompt: {prompt[:35]}...\nWidth: {width}\nHeight: {height}", fill="#39ff14")
+            elapsed = round(time.time() - start, 3)
+            info  = f"✅ [MOCK] Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
+            return image, info
+        except Exception as e:
+            return None, f"❌ Error: {str(e)}"
 
     generator = None
     if seed != -1:
@@ -112,6 +133,12 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
+/* Focus visible states for accessibility */
+button:focus-visible, a:focus-visible, input[type="range"]:focus-visible, .gr-button:focus-visible, textarea:focus-visible, input:focus-visible {
+    outline: 2px solid #39ff14 !important;
+    outline-offset: 2px !important;
+}
+
 /* Generate button */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
@@ -127,6 +154,24 @@ button.primary {
 }
 button.primary:hover {
     box-shadow: 0 0 35px rgba(230,57,70,0.6) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Secondary button styling for cyberpunk theme */
+button.secondary {
+    background: #0f1318 !important;
+    border: 1px solid rgba(230,57,70,0.4) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #e63946 !important;
+    transition: all 0.3s !important;
+}
+button.secondary:hover {
+    background: rgba(230,57,70,0.15) !important;
+    box-shadow: 0 0 15px rgba(230,57,70,0.2) !important;
     transform: translateY(-2px) !important;
 }
 
@@ -207,7 +252,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+                reset_btn = gr.Button("↺ RESET DEFAULTS", variant="secondary", size="lg")
 
             gr.Examples(
                 examples=examples,
@@ -241,6 +288,16 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
         outputs=[output_image, info_text],
+    )
+
+    # ── RESET FUNCTION ──────────────────────────────────────────────────────
+    def reset_defaults():
+        return "", "blurry, ugly, distorted, low quality, watermark", 25, 7.5, 512, 512, -1, None, ""
+
+    reset_btn.click(
+        fn=reset_defaults,
+        inputs=[],
+        outputs=[prompt, negative_prompt, steps, guidance, width, height, seed, output_image, info_text],
     )
 
     gr.HTML("""
