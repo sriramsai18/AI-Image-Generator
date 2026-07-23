@@ -3,21 +3,62 @@ import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
+import os
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+MOCK_MODE = os.getenv("MOCK_MODE", "0") in ("1", "true", "yes")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+if MOCK_MODE:
+    print("Running in MOCK_MODE (offline/mockup)...")
+    class MockPipeline:
+        def __init__(self):
+            class MockComponent:
+                def to(self, *args, **kwargs):
+                    return self
+            self.unet = MockComponent()
+            self.vae = MockComponent()
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+        def to(self, device):
+            return self
+
+        def enable_attention_slicing(self):
+            pass
+
+        def __call__(self, prompt, negative_prompt=None, num_inference_steps=25, guidance_scale=7.5, width=512, height=512, generator=None):
+            # Create a structured PIL canvas as offline mockup
+            image = Image.new("RGB", (width, height), color=(30, 40, 50))
+            class Result:
+                def __init__(self, images):
+                    self.images = images
+            return Result([image])
+
+    pipe = MockPipeline()
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+    # speed optimisation for CPU: avoid attention slicing unless RAM is extremely constrained (< 4GB)
+    if not torch.cuda.is_available():
+        try:
+            total_ram = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+        except Exception:
+            total_ram = 0
+        if total_ram > 0 and total_ram < 4 * 1024**3:
+            pipe.enable_attention_slicing()
+
+# Apply 'channels_last' memory formatting to UNet and VAE layers for performance optimization
+try:
+    pipe.unet.to(memory_format=torch.channels_last)
+    pipe.vae.to(memory_format=torch.channels_last)
+    print("Applied channels_last memory format to UNet and VAE layers ✅")
+except Exception as e:
+    print(f"Could not apply channels_last memory format: {e}")
 
 print("Model loaded ✅")
 
@@ -32,15 +73,17 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # wrap inference with torch.inference_mode() for speed and reduced memory usage
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
@@ -254,4 +297,6 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
     """)
 
 if __name__ == "__main__":
-    demo.launch()
+    server_name = os.getenv("GRADIO_SERVER_NAME", "127.0.0.1")
+    server_port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+    demo.launch(server_name=server_name, server_port=server_port)
