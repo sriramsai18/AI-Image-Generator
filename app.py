@@ -112,6 +112,17 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
+/* Accessibility Focus Indicators */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+    outline: 3px solid #39ff14 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 12px rgba(57, 255, 20, 0.6) !important;
+}
+
 /* Generate button */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
