@@ -3,28 +3,52 @@ import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
 import time
+import os
+
+MOCK_MODE = os.environ.get("MOCK_MODE") == "1"
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if MOCK_MODE:
+    print("Running in MOCK_MODE ✅ (No real pipeline loaded)")
+    pipe = None
+else:
+    print("Loading Stable Diffusion v1.5...")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
 
-print("Model loaded ✅")
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
     if not prompt.strip():
         return None, "⚠️ Please enter a prompt first!"
+
+    if MOCK_MODE:
+        try:
+            start = time.time()
+            from PIL import ImageDraw
+            img = Image.new("RGB", (int(width), int(height)), color="#0f1318")
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([(10, 10), (int(width) - 10, int(height) - 10)], outline="#e63946", width=3)
+            text = f"MOCK: {prompt[:35]}..." if len(prompt) > 35 else f"MOCK: {prompt}"
+            draw.text((20, 20), text, fill="#ffffff")
+            draw.text((20, 50), f"Steps: {steps} | CFG: {guidance}", fill="#8a9ab0")
+            draw.text((20, 80), f"Seed: {seed}", fill="#39ff14")
+            elapsed = round(time.time() - start, 3)
+            info = f"✅ [MOCK] Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
+            return img, info
+        except Exception as e:
+            return None, f"❌ Mock Generation Error: {str(e)}"
 
     generator = None
     if seed != -1:
@@ -112,6 +136,18 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
+/* Keyboard Accessibility - High Contrast Focus Indicators */
+:focus-visible,
+button:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+    outline: 2px solid #39ff14 !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 15px rgba(57, 255, 20, 0.6) !important;
+}
+
 /* Generate button */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
@@ -127,6 +163,25 @@ button.primary {
 }
 button.primary:hover {
     box-shadow: 0 0 35px rgba(230,57,70,0.6) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Secondary Reset Button styling */
+button.secondary {
+    background: #0f1318 !important;
+    border: 1px solid rgba(230,57,70,0.4) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #e63946 !important;
+    box-shadow: 0 0 10px rgba(230,57,70,0.1) !important;
+    transition: all 0.3s !important;
+}
+button.secondary:hover {
+    background: rgba(230,57,70,0.1) !important;
+    box-shadow: 0 0 25px rgba(230,57,70,0.4) !important;
     transform: translateY(-2px) !important;
 }
 
@@ -207,7 +262,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+                reset_btn = gr.Button("↺ RESET", variant="secondary", size="lg")
 
             gr.Examples(
                 examples=examples,
@@ -232,6 +289,23 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
             )
 
     # ── BIND ────────────────────────────────────────────────────────────────
+    def reset_inputs():
+        return (
+            "",                                                # prompt
+            "blurry, ugly, distorted, low quality, watermark", # negative_prompt
+            25,                                                # steps
+            7.5,                                               # guidance
+            512,                                               # width
+            512,                                               # height
+            -1                                                 # seed
+        )
+
+    reset_btn.click(
+        fn=reset_inputs,
+        inputs=[],
+        outputs=[prompt, negative_prompt, steps, guidance, width, height, seed]
+    )
+
     generate_btn.click(
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
