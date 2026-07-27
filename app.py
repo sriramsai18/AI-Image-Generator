@@ -106,10 +106,18 @@ textarea, input[type="text"], input[type="number"] {
     border-radius: 6px !important;
     color: #d4dde8 !important;
     font-family: 'Rajdhani', sans-serif !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease !important;
 }
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* Keyboard accessibility high-contrast focus indicators */
+*:focus-visible {
+    outline: 3px solid #ffcc00 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 15px #ffcc00 !important;
 }
 
 /* Generate button */
