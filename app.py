@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -106,10 +105,38 @@ textarea, input[type="text"], input[type="number"] {
     border-radius: 6px !important;
     color: #d4dde8 !important;
     font-family: 'Rajdhani', sans-serif !important;
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out !important;
+}
+textarea:hover, input[type="text"]:hover, input[type="number"]:hover {
+    border-color: rgba(230,57,70,0.5) !important;
 }
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* Accessibility Focus Indicators */
+button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible, select:focus-visible {
+    outline: 3px solid #e63946 !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 15px rgba(230,57,70,0.6) !important;
+}
+
+/* Secondary button styling (Clear action) */
+button.secondary {
+    background: #0f1318 !important;
+    border: 1px solid rgba(230,57,70,0.4) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #e63946 !important;
+    transition: all 0.3s !important;
+}
+button.secondary:hover {
+    background: rgba(230,57,70,0.1) !important;
+    box-shadow: 0 0 15px rgba(230,57,70,0.3) !important;
 }
 
 /* Generate button */
@@ -207,7 +234,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                clear_btn = gr.Button("🗑️ CLEAR PROMPT", variant="secondary", size="lg")
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
 
             gr.Examples(
                 examples=examples,
@@ -232,6 +261,11 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
             )
 
     # ── BIND ────────────────────────────────────────────────────────────────
+    clear_btn.click(
+        fn=lambda: ("", ""),
+        inputs=[],
+        outputs=[prompt, negative_prompt],
+    )
     generate_btn.click(
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
@@ -254,4 +288,7 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
     """)
 
 if __name__ == "__main__":
-    demo.launch()
+    import os
+    server_name = os.getenv("GRADIO_SERVER_NAME", "127.0.0.1")
+    server_port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+    demo.launch(server_name=server_name, server_port=server_port)
