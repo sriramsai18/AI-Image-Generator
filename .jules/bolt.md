@@ -1,0 +1,3 @@
+## 2025-02-12 - Stable Diffusion CPU Performance Tuning
+**Learning:** Enabling attention slicing (`enable_attention_slicing()`) on CPU systems with sufficient RAM (>4GB) introduces a severe CPU overhead of up to 230%, significantly slowing down generation. Additionally, inference without `torch.inference_mode()` tracks unnecessary gradients, and standard contiguous memory formatting on PyTorch UNet and VAE layers slows down inference compared to channels_last formatting.
+**Action:** Only enable attention slicing when RAM is extremely constrained (<4GB). Ensure UNet and VAE layers are converted to `channels_last` memory format and wrap inference inside `torch.inference_mode()`.
