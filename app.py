@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -147,6 +146,13 @@ input[type="range"] { accent-color: #e63946 !important; }
     color: #39ff14 !important;
     background: #0a0f0a !important;
     border-color: rgba(57,255,20,0.2) !important;
+}
+
+/* Focus Indicators for Keyboard Accessibility */
+button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible {
+    outline: 3px solid #39ff14 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 15px rgba(57,255,20,0.6) !important;
 }
 
 /* Accordion / panels */

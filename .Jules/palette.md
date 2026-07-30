@@ -1,0 +1,3 @@
+## 2025-02-15 - High-contrast Focus Indicators in Custom Dark/Neon Stylesheets
+**Learning:** Default browser focus outlines blend in or become completely invisible on dark background themes (e.g., custom cyberpunk styling), creating critical keyboard-accessibility barriers. Explicit high-contrast `:focus-visible` styles with glowing accent colors ensure high visibility and standard compliance without compromising theme aesthetics.
+**Action:** When designing dark/neon custom themes, always explicitly define high-contrast `:focus-visible` properties for interactive elements (buttons, inputs, textareas, links) utilizing theme-consistent bright accent colors.
