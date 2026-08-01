@@ -1,0 +1,3 @@
+## 2025-03-09 - Attention Slicing CPU Degradation & Memory Formats
+**Learning:** In PyTorch/Diffusers, `enable_attention_slicing()` introduces severe CPU overhead (up to ~230% slowdown) when system RAM is sufficient (>= 4GB) on CPU. Removing/limiting it to sub-4GB systems saves massive execution time. Furthermore, formatting UNet and VAE layers with `torch.channels_last` improves image processing speed, and wrapping inference inside `torch.inference_mode()` significantly reduces memory overhead and inference latency compared to normal context or `torch.no_grad()`.
+**Action:** Conditionally apply `enable_attention_slicing` only if system RAM is < 4GB, use `torch.channels_last` for UNet/VAE, and wrap generation loops inside `torch.inference_mode()`.
