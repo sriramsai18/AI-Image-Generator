@@ -1,0 +1,3 @@
+## 2025-08-02 - Gradio High-Contrast Keyboard Focus Support
+**Learning:** Gradio's internal UI components apply `outline: none !important;` to input and textarea focus states by default. To implement custom, theme-consistent high-contrast focus indicators for improved keyboard navigation/accessibility (a11y), we must use CSS selectors prefixed with `.gradio-container` paired with `!important` to achieve sufficient specificity to override the defaults.
+**Action:** Always prefix custom interactive component selectors with `.gradio-container` and declare `outline` and `box-shadow` properties with `!important` when customizing focus styling in Gradio custom CSS.
