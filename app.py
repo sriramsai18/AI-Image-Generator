@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -10,8 +9,8 @@ print("Loading Stable Diffusion v1.5...")
 pipe = StableDiffusionPipeline.from_pretrained(
     "runwayml/stable-diffusion-v1-5",
     torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
+    safety_checker=None,  # removes NSFW filter delay
+    requires_safety_checker=False,
 )
 pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -20,6 +19,7 @@ if not torch.cuda.is_available():
     pipe.enable_attention_slicing()
 
 print("Model loaded ✅")
+
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -43,19 +43,60 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
         )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
-        info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
+        info = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
     except Exception as e:
         return None, f"❌ Error: {str(e)}"
 
+
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
-    ["a lone tree in a golden wheat field at sunset, dramatic lighting, 4k", "blurry, ugly, distorted", 25, 7.5, 512, 512, -1],
-    ["a futuristic cyberpunk city at night, neon lights, rain, cinematic", "blurry, low quality", 30, 8.0, 512, 512, -1],
-    ["a majestic snow-capped mountain reflected in a crystal clear lake, hyperrealistic", "cartoon, painting", 25, 7.5, 512, 512, -1],
-    ["portrait of an astronaut on Mars, dramatic lighting, photorealistic", "ugly, deformed", 28, 7.5, 512, 512, -1],
-    ["a cozy cafe interior with warm lighting and coffee cups, aesthetic", "blurry, dark", 25, 7.0, 512, 512, -1],
+    [
+        "a lone tree in a golden wheat field at sunset, dramatic lighting, 4k",
+        "blurry, ugly, distorted",
+        25,
+        7.5,
+        512,
+        512,
+        -1,
+    ],
+    [
+        "a futuristic cyberpunk city at night, neon lights, rain, cinematic",
+        "blurry, low quality",
+        30,
+        8.0,
+        512,
+        512,
+        -1,
+    ],
+    [
+        "a majestic snow-capped mountain reflected in a crystal clear lake, hyperrealistic",
+        "cartoon, painting",
+        25,
+        7.5,
+        512,
+        512,
+        -1,
+    ],
+    [
+        "portrait of an astronaut on Mars, dramatic lighting, photorealistic",
+        "ugly, deformed",
+        28,
+        7.5,
+        512,
+        512,
+        -1,
+    ],
+    [
+        "a cozy cafe interior with warm lighting and coffee cups, aesthetic",
+        "blurry, dark",
+        25,
+        7.0,
+        512,
+        512,
+        -1,
+    ],
 ]
 
 # ─── CUSTOM CSS ───────────────────────────────────────────────────────────────
@@ -110,6 +151,16 @@ textarea, input[type="text"], input[type="number"] {
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* Accessibility: High-contrast focus indicators for keyboard navigation */
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container a:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 0 4px rgba(230, 57, 70, 0.4) !important;
 }
 
 /* Generate button */
@@ -173,7 +224,6 @@ input[type="range"] { accent-color: #e63946 !important; }
 
 # ─── GRADIO UI ────────────────────────────────────────────────────────────────
 with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
-
     gr.HTML("""
     <div class="app-header">
         <div class="app-title">TEXT <span>2</span> IMAGE</div>
@@ -182,10 +232,8 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
     """)
 
     with gr.Row():
-
         # ── LEFT: Controls ──────────────────────────────────────────────────
         with gr.Column(scale=1):
-
             prompt = gr.Textbox(
                 label="PROMPT",
                 placeholder="describe what you want to generate...",
@@ -195,16 +243,20 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                 label="NEGATIVE PROMPT  (what to avoid)",
                 placeholder="blurry, ugly, low quality, distorted...",
                 lines=2,
-                value="blurry, ugly, distorted, low quality, watermark"
+                value="blurry, ugly, distorted, low quality, watermark",
             )
 
             with gr.Accordion("⚙️ ADVANCED SETTINGS", open=False):
                 with gr.Row():
-                    steps    = gr.Slider(10, 50, value=25, step=1,   label="INFERENCE STEPS")
-                    guidance = gr.Slider(1,  20, value=7.5, step=0.5, label="GUIDANCE SCALE (CFG)")
+                    steps = gr.Slider(10, 50, value=25, step=1, label="INFERENCE STEPS")
+                    guidance = gr.Slider(
+                        1, 20, value=7.5, step=0.5, label="GUIDANCE SCALE (CFG)"
+                    )
                 with gr.Row():
-                    width  = gr.Slider(256, 768, value=512, step=64, label="WIDTH (px)")
-                    height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
+                    width = gr.Slider(256, 768, value=512, step=64, label="WIDTH (px)")
+                    height = gr.Slider(
+                        256, 768, value=512, step=64, label="HEIGHT (px)"
+                    )
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
             generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
