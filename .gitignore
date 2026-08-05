@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+mock_app.py
+mock_app.log
+test_app.py
+*.png
