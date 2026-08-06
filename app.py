@@ -112,6 +112,16 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
+/* High-contrast focus-visible outline for keyboard navigation accessibility */
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container a:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(230,57,70,0.4) !important;
+}
+
 /* Generate button */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
@@ -127,6 +137,25 @@ button.primary {
 }
 button.primary:hover {
     box-shadow: 0 0 35px rgba(230,57,70,0.6) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Reset/Secondary button */
+button.secondary {
+    background: #0f1318 !important;
+    border: 1px solid rgba(230,57,70,0.5) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #e63946 !important;
+    box-shadow: 0 0 10px rgba(230,57,70,0.1) !important;
+    transition: all 0.3s !important;
+}
+button.secondary:hover {
+    background: rgba(230,57,70,0.1) !important;
+    box-shadow: 0 0 20px rgba(230,57,70,0.3) !important;
     transform: translateY(-2px) !important;
 }
 
@@ -207,7 +236,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+                reset_btn = gr.Button("🧹 RESET", variant="secondary", size="lg")
 
             gr.Examples(
                 examples=examples,
@@ -241,6 +272,15 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
         outputs=[output_image, info_text],
+    )
+
+    def reset_all_fields():
+        return "", "blurry, ugly, distorted, low quality, watermark", 25, 7.5, 512, 512, -1, None, ""
+
+    reset_btn.click(
+        fn=reset_all_fields,
+        inputs=[],
+        outputs=[prompt, negative_prompt, steps, guidance, width, height, seed, output_image, info_text]
     )
 
     gr.HTML("""

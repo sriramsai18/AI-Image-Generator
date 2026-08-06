@@ -1,0 +1,3 @@
+## 2024-08-06 - High-Contrast Keyboard Focus Indicators in Gradio Dark Mode
+**Learning:** In highly customized dark/neon interfaces built on top of Gradio, default focus rings can easily blend into the background or be completely overridden by Gradio's internal `!important` inputs and textareas rules. Specifying `:focus-visible` with a high specificity selector (such as `.gradio-container button:focus-visible`) and using `!important` for properties like `outline` and `box-shadow` is necessary to ensure keyboard focus visibility is accessible.
+**Action:** Always verify keyboard accessibility on dark-themed apps by declaring high-contrast focus styling explicitly under the `.gradio-container` scope with `!important` overrides.
