@@ -1,0 +1,3 @@
+## 2025-08-07 - High-contrast Keyboard Focus Indicator for Neon Dark Theme
+**Learning:** Gradio UI widgets often employ internal styling with `!important` that overrides standard focus indicators. To make keyboard focus clearly visible in dark, high-contrast neon custom themes, the focus-visible outline styles must be explicitly declared using high specificity selectors prefixed by `.gradio-container` and using `!important`.
+**Action:** Always add high-contrast, custom `:focus-visible` CSS overrides prefixed with `.gradio-container` to style the keyboard focus rings on inputs, textareas, sliders, and buttons.
