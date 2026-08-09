@@ -1,0 +1,3 @@
+## 2026-08-09 - Stable Diffusion CPU Performance Bottlenecks
+**Learning:** Attention slicing (`enable_attention_slicing`) is a memory-saving technique that introduces severe CPU overhead (up to ~230% slowdown) and should be avoided on CPU unless RAM is extremely constrained (<4GB). Conversely, applying `channels_last` memory layout to UNet and VAE modules and wrapping inference inside PyTorch's `inference_mode` drastically optimizes computation speed.
+**Action:** Always inspect physical system memory before enabling attention slicing, and systematically leverage `channels_last` memory layout and `inference_mode` context managers for PyTorch-based image generation pipelines.
