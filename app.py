@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -15,9 +14,31 @@ pipe = StableDiffusionPipeline.from_pretrained(
 )
 pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
+# speed optimisation: Apply channels_last memory format for accelerated PyTorch convolutions
+try:
+    pipe.unet.to(memory_format=torch.channels_last)
+    pipe.vae.to(memory_format=torch.channels_last)
+    print("Memory format set to channels_last for UNet and VAE ✅")
+except Exception as e:
+    print(f"Could not apply channels_last: {e}")
+
+# speed optimisation for CPU based on RAM limits
 if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    import os
+    try:
+        # Avoid psutil dependency by reading system configuration directly
+        ram_bytes = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+        ram_gb = ram_bytes / (1024 ** 3)
+    except Exception:
+        ram_gb = 8.0  # Fallback to a safe default if SC_PAGE_SIZE/SC_PHYS_PAGES is not supported
+
+    # Attention slicing introduces severe CPU overhead (up to ~230% slowdown)
+    # and should be avoided on CPU unless RAM is extremely constrained (<4GB).
+    if ram_gb < 4.0:
+        pipe.enable_attention_slicing()
+        print("Attention slicing enabled (RAM < 4GB) ✅")
+    else:
+        print(f"Attention slicing skipped (RAM is {ram_gb:.1f}GB >= 4GB) ✅")
 
 print("Model loaded ✅")
 
@@ -32,15 +53,17 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # speed optimisation: inference_mode disables gradient tracking, reducing latency and memory usage
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
