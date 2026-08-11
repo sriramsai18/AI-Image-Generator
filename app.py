@@ -1,8 +1,8 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
+import os
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
 print("Loading Stable Diffusion v1.5...")
@@ -15,9 +15,24 @@ pipe = StableDiffusionPipeline.from_pretrained(
 )
 pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
+# Apply channels_last memory format optimization to UNet and VAE for faster convolutions
+if hasattr(pipe, "unet") and pipe.unet is not None:
+    pipe.unet.to(memory_format=torch.channels_last)
+if hasattr(pipe, "vae") and pipe.vae is not None:
+    pipe.vae.to(memory_format=torch.channels_last)
+
+# speed optimisation for CPU - avoid attention slicing unless RAM is extremely constrained (< 4GB)
+# to prevent severe CPU overhead (up to ~230% slowdown).
 if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    try:
+        # Retrieve total system RAM in bytes on POSIX systems
+        total_ram = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')
+    except (AttributeError, ValueError, OSError):
+        # Default to a safe fallback (e.g. 8GB) if sysconf is unavailable (like on Windows)
+        total_ram = 8 * 1024 * 1024 * 1024
+
+    if total_ram < 4 * 1024 * 1024 * 1024:
+        pipe.enable_attention_slicing()
 
 print("Model loaded ✅")
 
@@ -32,15 +47,17 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # Use torch.inference_mode() to skip autograd overhead for faster inference
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
