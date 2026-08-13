@@ -1,8 +1,8 @@
+import time
+
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
-import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
 print("Loading Stable Diffusion v1.5...")
@@ -46,8 +46,8 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
-    except Exception as e:
-        return None, f"❌ Error: {str(e)}"
+    except Exception as e:  # noqa: BLE001
+        return None, f"❌ Error: {e!s}"
 
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
@@ -110,6 +110,13 @@ textarea, input[type="text"], input[type="number"] {
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* High-contrast keyboard focus indicators for accessibility */
+.gradio-container *:focus-visible {
+    outline: 2px solid #39ff14 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 2px #080b0f, 0 0 12px #39ff14 !important;
 }
 
 /* Generate button */
