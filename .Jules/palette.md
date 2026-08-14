@@ -1,0 +1,3 @@
+## 2025-08-14 - Gradio Custom Keyboard Focus Indicators
+**Learning:** Gradio's internal components often inject CSS rules with `!important` (such as `outline: none !important;` on inputs and textareas) that override standard tag-level focus rules. When custom dark/neon stylesheets are used, default focus indicators can blend in or completely disappear, leaving keyboard navigation blind.
+**Action:** To successfully guarantee keyboard accessibility, custom styles must use higher specificity selectors (e.g., prefixing with `.gradio-container`), target specific interactive tags (button, input, textarea, a) with `:focus-visible`, and use `!important` on `outline` and `box-shadow` properties to properly override Gradio's defaults.
