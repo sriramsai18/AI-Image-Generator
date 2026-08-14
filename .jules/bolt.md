@@ -1,0 +1,3 @@
+## 2026-02-27 - Stable Diffusion Performance Optimizations
+**Learning:** Attention slicing (`pipe.enable_attention_slicing()`) on CPU introduces severe overhead (up to ~230% slowdown) and should be avoided unless physical RAM is highly constrained (< 4GB). Memory layout optimizations using `channels_last` memory format on UNet and VAE modules along with `torch.inference_mode()` during the generation pass dramatically reduce latency and memory overhead.
+**Action:** Always inspect available system RAM using standard `os.sysconf` on CPU before conditionally enabling attention slicing, format model layers with `channels_last`, and wrap the pipeline inference call in `torch.inference_mode()` for maximum speed.
