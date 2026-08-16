@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -169,6 +168,17 @@ input[type="range"] { accent-color: #e63946 !important; }
 }
 .app-footer a { color: #e63946; text-decoration: none; }
 .app-footer a:hover { text-decoration: underline; }
+
+/* Accessibility Focus States */
+.gradio-container button:focus-visible,
+.gradio-container a:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container [role="button"]:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 10px rgba(230, 57, 70, 0.8) !important;
+}
 """
 
 # ─── GRADIO UI ────────────────────────────────────────────────────────────────
