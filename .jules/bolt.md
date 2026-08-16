@@ -1,0 +1,3 @@
+## 2024-08-16 - PyTorch Inference Optimization in Diffusers Pipelines
+**Learning:** Standard PyTorch forward calls in Hugging Face diffusers pipelines carry autograd and tensor view tracking overhead unless explicitly wrapped in `torch.inference_mode()`. Furthermore, UNet 2D convolution execution speed improves when using `torch.channels_last` memory layout, whereas CPU-side `enable_attention_slicing()` introduces severe slicing loop overhead unless system RAM is severely constrained (<4GB).
+**Action:** Always wrap `pipe(...)` inference calls with `with torch.inference_mode()`, apply `channels_last` memory layout to `pipe.unet`, and avoid CPU attention slicing unless low-memory constraints strictly require it.
