@@ -1,0 +1,3 @@
+## 2025-08-17 - Keyboard Focus States for Dark/Neon Theme
+**Learning:** Gradio's internal components often inject CSS rules with `!important` (such as `outline: none !important;` on inputs and textareas) that override standard tag-level focus rules. To successfully override these for keyboard focus accessibility, custom styles must use higher specificity selectors (e.g., prefixing with `.gradio-container`) and use `!important` on properties like `outline` and `box-shadow`.
+**Action:** Always scope keyboard `:focus-visible` styles with `.gradio-container` and `!important` flags when enhancing dark mode or custom-themed Gradio apps.
