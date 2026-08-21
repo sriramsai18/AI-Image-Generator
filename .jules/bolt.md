@@ -1,0 +1,3 @@
+## 2026-08-21 - Stable Diffusion Inference Optimization on CPU
+**Learning:** `enable_attention_slicing()` in Diffusers trades CPU compute time for RAM reduction. On machines with sufficient RAM (>=4GB), attention slicing introduces significant loop overhead (~25% slowdown) and should be bypassed. Combining `torch.channels_last` memory format on UNet/VAE and `torch.inference_mode()` context manager yields substantial inference speedups.
+**Action:** Always check available system RAM before enabling attention slicing on CPU, apply `channels_last` layout to 2D conv models, and wrap pipeline calls in `torch.inference_mode()`.
