@@ -1,0 +1,3 @@
+## 2026-08-23 - Gradio Focus-Visible High-Contrast Rules
+**Learning:** Gradio custom dark themes suppress standard focus outlines with `outline: none !important` on interactive controls. Standard tag-level `:focus` rules fail to provide visible feedback for keyboard users unless prefixed with container specificity (e.g., `.gradio-container button:focus-visible`) and using `!important` on `outline` and `box-shadow`.
+**Action:** Always scope `:focus-visible` selectors with `.gradio-container` and `!important` flags when designing custom dark theme styles for Gradio apps to guarantee keyboard focus visibility.
