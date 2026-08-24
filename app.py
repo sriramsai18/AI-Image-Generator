@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -110,6 +109,16 @@ textarea, input[type="text"], input[type="number"] {
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* Accessible Keyboard Focus States */
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container a:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 10px rgba(230, 57, 70, 0.6) !important;
 }
 
 /* Generate button */
