@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -15,6 +14,12 @@ pipe = StableDiffusionPipeline.from_pretrained(
 )
 pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
+# Performance optimization: Apply channels_last memory format for faster 2D convolutions
+if hasattr(pipe, "unet"):
+    pipe.unet.to(memory_format=torch.channels_last)
+if hasattr(pipe, "vae"):
+    pipe.vae.to(memory_format=torch.channels_last)
+
 # speed optimisation for CPU
 if not torch.cuda.is_available():
     pipe.enable_attention_slicing()
@@ -22,6 +27,7 @@ if not torch.cuda.is_available():
 print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
+@torch.inference_mode()
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
     if not prompt.strip():
         return None, "⚠️ Please enter a prompt first!"
@@ -32,6 +38,7 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
+        # Zero-autograd and tensor tracking overhead during inference
         result = pipe(
             prompt=prompt,
             negative_prompt=negative_prompt if negative_prompt.strip() else None,
