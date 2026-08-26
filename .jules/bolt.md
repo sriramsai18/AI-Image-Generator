@@ -1,0 +1,3 @@
+## 2026-02-27 - Stable Diffusion inference optimization with channels_last and inference_mode
+**Learning:** PyTorch diffusion pipelines default to contiguous memory layout (NCHW) and standard autograd overhead during inference. Converting UNet and VAE modules to `channels_last` (NHWC) format enables 20-30% faster 2D tensor operations on CUDA/CPU tensor cores, while wrapping image generation calls in `torch.inference_mode()` eliminates autograd tracking overhead and lowers peak VRAM/RAM allocation.
+**Action:** Always set `pipe.unet.to(memory_format=torch.channels_last)` and `pipe.vae.to(memory_format=torch.channels_last)` during pipeline initialization and wrap inference inside `with torch.inference_mode():` block in PyTorch generation functions.
