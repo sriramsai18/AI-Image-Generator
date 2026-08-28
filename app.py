@@ -1,8 +1,9 @@
+import contextlib
+import time
+
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
-import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
 print("Loading Stable Diffusion v1.5...")
@@ -14,6 +15,13 @@ pipe = StableDiffusionPipeline.from_pretrained(
     requires_safety_checker=False
 )
 pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+# Performance optimization: Channels Last memory format for 4D convolutions (UNet/VAE)
+with contextlib.suppress(AttributeError, RuntimeError, TypeError):
+    if hasattr(pipe, "unet") and pipe.unet is not None:
+        pipe.unet.to(memory_format=torch.channels_last)
+    if hasattr(pipe, "vae") and pipe.vae is not None:
+        pipe.vae.to(memory_format=torch.channels_last)
 
 # speed optimisation for CPU
 if not torch.cuda.is_available():
@@ -32,22 +40,25 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # Performance optimization: wrap inference with torch.inference_mode()
+        # to disable autograd tracking and reduce execution overhead/memory footprint
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
-        info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
+        info = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
     except Exception as e:
-        return None, f"❌ Error: {str(e)}"
+        return None, f"❌ Error: {e!s}"
 
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
@@ -200,10 +211,10 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
 
             with gr.Accordion("⚙️ ADVANCED SETTINGS", open=False):
                 with gr.Row():
-                    steps    = gr.Slider(10, 50, value=25, step=1,   label="INFERENCE STEPS")
-                    guidance = gr.Slider(1,  20, value=7.5, step=0.5, label="GUIDANCE SCALE (CFG)")
+                    steps = gr.Slider(10, 50, value=25, step=1, label="INFERENCE STEPS")
+                    guidance = gr.Slider(1, 20, value=7.5, step=0.5, label="GUIDANCE SCALE (CFG)")
                 with gr.Row():
-                    width  = gr.Slider(256, 768, value=512, step=64, label="WIDTH (px)")
+                    width = gr.Slider(256, 768, value=512, step=64, label="WIDTH (px)")
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
