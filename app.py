@@ -67,6 +67,16 @@ body, .gradio-container {
     font-family: 'Rajdhani', sans-serif !important;
 }
 
+/* Keyboard focus accessibility */
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container a:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 12px rgba(230, 57, 70, 0.6) !important;
+}
+
 /* Header */
 .app-header {
     text-align: center;
