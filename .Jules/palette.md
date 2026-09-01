@@ -1,0 +1,3 @@
+## 2026-09-01 - Keyboard Focus Accessibility in Gradio Dark Themes
+**Learning:** In Gradio applications with custom dark themes, default browser focus outlines are often obscured by dark background colors or overridden by internal component styling. Scoping `:focus-visible` rules specifically with higher specificity (e.g. `.gradio-container button:focus-visible`) and high-contrast outline/box-shadow guarantees visible, accessible focus indicators for keyboard users.
+**Action:** Always include high-contrast `:focus-visible` CSS rules scoped under `.gradio-container` for `button`, `input`, `textarea`, and `a` elements when designing or updating custom Gradio UI themes.
