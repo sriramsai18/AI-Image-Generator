@@ -1,0 +1,3 @@
+## 2026-09-04 - PyTorch Inference Mode and Channels Last Memory Format
+**Learning:** Stable Diffusion pipeline inference in Diffusers executes multiple forward passes across UNet and VAE blocks. Without `torch.inference_mode()`, PyTorch incurs autograd graph tracking overhead during every forward pass. Additionally, using `memory_format=torch.channels_last` on UNet/VAE formats 4D tensors to NHWC memory layout, providing up to ~48% faster convolution kernel operations.
+**Action:** Always wrap `pipe(...)` invocations with `with torch.inference_mode():` and convert UNet and VAE layers to `torch.channels_last` upon pipeline initialization.
