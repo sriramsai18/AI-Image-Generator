@@ -1,0 +1,3 @@
+## 2025-05-18 - Stable Diffusion Pipeline Inference & Memory Optimizations
+**Learning:** In PyTorch 2.x Stable Diffusion pipelines, running inference without `torch.inference_mode()` incurs autograd and tensor tracking overhead. Furthermore, default contiguous memory formatting for UNet/VAE convolutions is less cache-efficient than `torch.channels_last`, and CPU `enable_attention_slicing()` introduces severe compute overhead (~200%+ slowdown) when RAM is not constrained (< 4GB).
+**Action:** Always wrap pipeline inference calls in `with torch.inference_mode():`, apply `memory_format=torch.channels_last` to UNet/VAE modules, and only enable attention slicing on CPU when system memory is strictly constrained (< 4GB RAM).
