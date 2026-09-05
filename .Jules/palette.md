@@ -1,0 +1,3 @@
+## 2025-09-05 - Gradio Focus-Visible High-Contrast Indicators
+**Learning:** Gradio component styles often override default browser focus outlines on inputs, textareas, buttons, and links with `!important` declarations, which renders default keyboard focus invisible in custom dark themes. Scoping `:focus-visible` rules under `.gradio-container` with elevated specificity and `!important` outline properties restores clear, accessible keyboard navigation without breaking mouse focus aesthetics.
+**Action:** Always scope custom `:focus-visible` CSS under `.gradio-container` for `button`, `input`, `textarea`, and `a` elements when customizing Gradio dark themes.
