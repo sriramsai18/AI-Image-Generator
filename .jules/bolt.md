@@ -1,0 +1,3 @@
+## 2025-09-06 - Torch Inference Mode Optimization for Diffusion Inference
+**Learning:** PyTorch by default tracks operations and version counters during tensor evaluation unless explicitly disabled. In Stable Diffusion inference pipelines (like Diffusers `StableDiffusionPipeline`), wrapping execution in `@torch.inference_mode()` completely turns off autograd machinery and version tracking, reducing memory consumption and speeding up inference iterations.
+**Action:** Always wrap PyTorch model inference functions with `@torch.inference_mode()` (or `torch.no_grad()`) when gradients are not required.
