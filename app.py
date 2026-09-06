@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -22,6 +21,9 @@ if not torch.cuda.is_available():
 print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
+# Speed optimization: @torch.inference_mode() disables autograd and tensor version tracking,
+# reducing latency and memory overhead during model forward passes.
+@torch.inference_mode()
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
     if not prompt.strip():
         return None, "⚠️ Please enter a prompt first!"
