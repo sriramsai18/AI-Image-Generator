@@ -1,0 +1,3 @@
+## 2026-03-31 - Stable Diffusion Model Memory Layout and Inference Overhead Optimization
+**Learning:** PyTorch Stable Diffusion pipelines experience significant execution overhead due to autograd metadata tracking and suboptimal 2D convolution memory layouts (NCHW vs NHWC). Applying `channels_last` memory format (`pipe.unet.to(memory_format=torch.channels_last)`) optimizes memory locality for 2D convolutions, and wrapping inference in `torch.inference_mode()` disables autograd tracking completely.
+**Action:** Always format 2D convolutional networks (like UNet/VAE in diffusers) to `channels_last` and wrap model generation within `with torch.inference_mode():` context blocks.
