@@ -1,0 +1,3 @@
+## 2026-02-27 - Stable Diffusion Inference Optimization & Attention Slicing Pitfall
+**Learning:** In PyTorch/Diffusers pipelines, wrapping generation calls with `torch.inference_mode()` disables autograd tracking and optimizes tensor allocations, while setting `channels_last` memory layout (`pipe.unet.to(memory_format=torch.channels_last)`) accelerates 4D convolutions. Furthermore, enabling `attention_slicing` on CPU environments with sufficient memory introduces significant chunking overhead (up to ~230% slowdown) and should be avoided.
+**Action:** Always apply `torch.inference_mode()` and `channels_last` for PyTorch/Diffusers vision models, and do not default to enabling `attention_slicing` unless system RAM is severely constrained.
