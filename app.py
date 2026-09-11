@@ -112,6 +112,17 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
+/* Accessibility Focus Indicators */
+.gradio-container button:focus-visible,
+.gradio-container a:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container [role="button"]:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 12px rgba(230,57,70,0.4) !important;
+}
+
 /* Generate button */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
