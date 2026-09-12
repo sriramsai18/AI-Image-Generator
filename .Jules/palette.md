@@ -1,0 +1,3 @@
+## 2024-09-12 - High-contrast Keyboard Focus Indicators in Gradio Custom Themes
+**Learning:** Gradio's internal styles often reset default focus outlines or use weak contrast focus ring states in dark themes. Explicitly targeting `:focus-visible` with higher specificity (e.g., `.gradio-container button:focus-visible`) and using `!important` ensures keyboard navigation remains distinct and accessible across custom dark/cyberpunk UI themes.
+**Action:** When customizing Gradio themes, always declare explicit `:focus-visible` styles for `button`, `input`, `textarea`, and `a` tags using `.gradio-container` selector specificity.
