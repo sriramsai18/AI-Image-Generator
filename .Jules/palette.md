@@ -1,0 +1,3 @@
+## 2025-02-18 - High-Contrast Focus Visible Indicators in Gradio Custom Themes
+**Learning:** Gradio component wrappers can override standard browser focus rings, making keyboard navigation difficult to track visually in dark themes. High-specificity `:focus-visible` rules scoped under `.gradio-container` with `!important` on `outline` and `box-shadow` restore clear keyboard accessibility without affecting pointer clicks.
+**Action:** When customizing Gradio dark or cyberpunk CSS themes, always include explicit high-contrast `:focus-visible` rules for `button`, `input`, `textarea`, and `a` elements.
