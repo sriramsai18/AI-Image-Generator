@@ -1,0 +1,3 @@
+## 2026-03-14 - Stable Diffusion CPU attention slicing vs torch.inference_mode & memory channels_last
+**Learning:** `pipe.enable_attention_slicing()` introduces severe CPU overhead (up to ~230% slowdown) when system RAM is sufficient and should only be enabled when RAM is constrained (<4GB). Using `torch.inference_mode()` and `channels_last` memory layout on UNet/VAE models provides clean speedups without gradient tracking overhead.
+**Action:** Always check total system RAM before enabling attention slicing on CPU, and wrap diffusers inference calls in `torch.inference_mode()` with `channels_last` memory format on PyTorch 2D models.
