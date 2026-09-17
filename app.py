@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -65,6 +64,13 @@ css = """
 body, .gradio-container {
     background: #080b0f !important;
     font-family: 'Rajdhani', sans-serif !important;
+}
+
+/* Keyboard Accessibility Focus Styles */
+button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible, [role="button"]:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 10px rgba(230, 57, 70, 0.6) !important;
 }
 
 /* Header */
