@@ -1,0 +1,3 @@
+## 2026-09-17 - Gradio Keyboard Focus Visibility Overrides
+**Learning:** Gradio's internal UI components apply default outline styles that can make focused elements difficult to see in custom dark/neon cyberpunk themes during keyboard navigation. To ensure keyboard focus accessibility (`:focus-visible`), explicit high-contrast focus indicators with high specificity and `!important` must be declared for interactive tags (`button`, `input`, `textarea`, `a`, `[role="button"]`).
+**Action:** Always include high-contrast `:focus-visible` styles with `outline` and `box-shadow` in custom Gradio CSS blocks to guarantee clear keyboard focus navigation in dark mode interfaces.
