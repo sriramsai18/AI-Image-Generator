@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -22,13 +21,15 @@ if not torch.cuda.is_available():
 print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
+@torch.inference_mode()
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
     if not prompt.strip():
         return None, "⚠️ Please enter a prompt first!"
 
     generator = None
     if seed != -1:
-        generator = torch.Generator().manual_seed(int(seed))
+        # Match pipeline device to avoid unnecessary cross-device CPU/GPU sync
+        generator = torch.Generator(device=pipe.device).manual_seed(int(seed))
 
     try:
         start = time.time()

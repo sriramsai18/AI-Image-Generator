@@ -1,0 +1,3 @@
+## 2026-09-18 - PyTorch Inference Mode Optimization
+**Learning:** Running PyTorch model pipeline inference without disabling autograd introduces overhead by building computational graph metadata and tracking tensor versions unnecessarily. Decorating inference handlers with `@torch.inference_mode()` completely disables autograd and view tracking, improving speed and reducing memory consumption during image generation.
+**Action:** Always wrap PyTorch model inference functions in `@torch.inference_mode()` (or `with torch.inference_mode():`) and align `torch.Generator` device with `pipe.device` to prevent unnecessary cross-device transfers.
