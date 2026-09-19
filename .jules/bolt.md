@@ -1,0 +1,3 @@
+## 2026-05-18 - Stable Diffusion Memory Layout & Inference Mode Optimization
+**Learning:** PyTorch UNet/VAE models benefit significantly from `channels_last` memory layout for 2D convolutions, and wrapping diffusion inference in `torch.inference_mode()` eliminates autograd/tensor tracking overhead. Additionally, `enable_attention_slicing()` on CPU causes unnecessary compute slowdown when system RAM (>4GB) is sufficient.
+**Action:** Always format pipeline UNet/VAE layers to `channels_last`, wrap diffusion generation in `torch.inference_mode()`, and avoid enabling attention slicing on CPU unless system memory is severely constrained.
