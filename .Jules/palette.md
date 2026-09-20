@@ -1,0 +1,3 @@
+## 2026-09-20 - High-Contrast Focus Visible Rules for Gradio Custom Dark Themes
+**Learning:** Gradio components override default browser outline styles with `outline: none !important` on textareas and inputs. In custom dark cyberpunk themes, this makes keyboard focus indicators invisible when tabbing between interactive elements.
+**Action:** Always declare explicit `.gradio-container` higher-specificity `:focus-visible` styles with `outline: 2px solid <theme-accent> !important;` and `box-shadow` for standard interactive tags (button, input, textarea, a, [tabindex]) to guarantee keyboard focus accessibility.
