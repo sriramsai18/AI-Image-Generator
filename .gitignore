@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+verify_ui.py
+focus_verification.png
