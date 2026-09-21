@@ -1,0 +1,3 @@
+## 2026-09-21 - High-contrast Keyboard Focus Indicators in Dark Gradio Themes
+**Learning:** Gradio's internal CSS injects `!important` rules on textareas and buttons that hide or override default browser focus outlines. In dark-themed web interfaces, default focus rings are often invisible, making keyboard navigation difficult for screen reader and keyboard users.
+**Action:** Always scope `:focus-visible` custom styles using `.gradio-container` with higher specificity and `!important` rules for `outline`, `outline-offset`, and `box-shadow` to ensure interactive controls remain clearly visible during keyboard tab navigation.
