@@ -1,8 +1,8 @@
+import time
+
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
-import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
 print("Loading Stable Diffusion v1.5...")
@@ -32,22 +32,25 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # Optimization: wrap pipeline inference in torch.inference_mode()
+        # to disable autograd tracking and reduce latency and memory footprint.
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
     except Exception as e:
-        return None, f"❌ Error: {str(e)}"
+        return None, f"❌ Error: {e!s}"
 
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
