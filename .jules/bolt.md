@@ -1,0 +1,3 @@
+## 2026-03-31 - Stable Diffusion Inference Optimization with torch.inference_mode and channels_last
+**Learning:** Standard PyTorch forward passes tracking autograd graphs incur overhead and higher memory footprint during generative inference. Additionally, default PyTorch 4D tensor contiguous layout (NCHW) is less performant for 2D convolutions compared to channels-last layout (NHWC).
+**Action:** Wrap Stable Diffusion pipeline calls in `with torch.inference_mode():` and convert UNet and VAE modules to `memory_format=torch.channels_last` to maximize throughput and minimize memory allocation during generation.
