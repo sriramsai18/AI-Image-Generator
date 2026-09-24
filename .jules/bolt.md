@@ -1,0 +1,3 @@
+## 2026-03-30 - Stable Diffusion Pipeline Inference & Memory Optimization
+**Learning:** PyTorch Stable Diffusion pipelines benefit significantly from applying `channels_last` memory layout to UNet and VAE modules (optimizing 2D convolutions via NHWC layout memory access) and wrapping `pipe()` inference calls in `torch.inference_mode()`. In contrast to `torch.no_grad()`, `torch.inference_mode()` completely disables view tracking and version counter updates, resulting in lower CPU latency per generation step.
+**Action:** Always format UNet/VAE models with `to(memory_format=torch.channels_last)` after pipeline instantiation and wrap generation calls in `with torch.inference_mode():`.
