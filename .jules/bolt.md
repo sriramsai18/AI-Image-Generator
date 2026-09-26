@@ -1,0 +1,3 @@
+## 2026-09-26 - Stable Diffusion Inference Optimization with torch.inference_mode and channels_last
+**Learning:** Wrapping Hugging Face diffusers pipeline calls with `torch.inference_mode()` disables autograd overhead and tensor tracking during image generation. Furthermore, setting `channels_last` memory format on the UNet and VAE components on CUDA devices speeds up 2D spatial convolution operations without altering output quality.
+**Action:** Always wrap PyTorch inference passes in `with torch.inference_mode():` and convert 2D CNN models to `channels_last` memory format on CUDA in generative AI pipelines.
