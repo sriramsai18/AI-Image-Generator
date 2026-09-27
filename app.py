@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -110,6 +109,17 @@ textarea, input[type="text"], input[type="number"] {
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* Accessibility Focus Indicators */
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container a:focus-visible,
+.gradio-container [role="button"]:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 12px rgba(230,57,70,0.6) !important;
 }
 
 /* Generate button */
@@ -245,11 +255,11 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
 
     gr.HTML("""
     <div class="app-footer">
-        Built by <a href="https://github.com/sriramsai18" target="_blank">Sriram Sai Laggisetti</a>
+        Built by <a href="https://github.com/sriramsai18" target="_blank" rel="noopener noreferrer">Sriram Sai Laggisetti</a>
         &nbsp;·&nbsp;
-        Model: <a href="https://huggingface.co/runwayml/stable-diffusion-v1-5" target="_blank">runwayml/stable-diffusion-v1-5</a>
+        Model: <a href="https://huggingface.co/runwayml/stable-diffusion-v1-5" target="_blank" rel="noopener noreferrer">runwayml/stable-diffusion-v1-5</a>
         &nbsp;·&nbsp;
-        <a href="https://www.linkedin.com/in/sriram-sai-laggisetti/" target="_blank">LinkedIn</a>
+        <a href="https://www.linkedin.com/in/sriram-sai-laggisetti/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
     </div>
     """)
 
