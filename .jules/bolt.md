@@ -1,0 +1,3 @@
+## 2025-05-10 - Channels Last Memory Format and Inference Mode Optimization for Diffusion Models
+**Learning:** PyTorch Stable Diffusion pipelines execute multiple 2D convolution operations in UNet and VAE layers. Converting these modules to `channels_last` memory format (NHWC) and wrapping generation in `torch.inference_mode()` disables autograd tracking and reduces tensor layout conversion overhead, resulting in lower memory usage and faster forward pass execution.
+**Action:** Always format UNet and VAE layers with `torch.channels_last` and wrap `pipe(...)` diffusion sampling in `torch.inference_mode()` when serving PyTorch diffusion models.
