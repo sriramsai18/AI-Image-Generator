@@ -1,0 +1,3 @@
+## 2026-02-27 - Stable Diffusion Inference & Memory Layout Optimization
+**Learning:** In PyTorch and Hugging Face diffusers pipelines, running generation without `torch.inference_mode()` retains autograd tracking overhead. Additionally, applying `channels_last` memory formatting to UNet and VAE layers significantly speeds up 2D convolutions (by ~13%). Lastly, `enable_attention_slicing()` introduces severe Python/loop overhead on CPU when system RAM is sufficient (>=4GB), and should only be enabled under memory constraints.
+**Action:** Always wrap inference in `with torch.inference_mode()`, apply `channels_last` memory layout to UNet/VAE models, and check available system memory before enabling attention slicing on CPU.
