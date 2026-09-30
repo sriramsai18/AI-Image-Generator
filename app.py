@@ -112,6 +112,20 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
+/* Accessibility & Keyboard Focus Styles */
+:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 14px rgba(230,57,70,0.6) !important;
+}
+
 /* Generate button */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
@@ -167,7 +181,7 @@ input[type="range"] { accent-color: #e63946 !important; }
     border-top: 1px solid rgba(230,57,70,0.1);
     margin-top: 20px;
 }
-.app-footer a { color: #e63946; text-decoration: none; }
+.app-footer a { color: #e63946; text-decoration: none; border-radius: 2px; }
 .app-footer a:hover { text-decoration: underline; }
 """
 
