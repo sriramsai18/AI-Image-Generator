@@ -1,0 +1,3 @@
+## 2026-10-01 - Gradio Custom CSS Focus Outline Specificity
+**Learning:** Gradio's internal components inject default CSS rules that often override standard focus indicators in dark/neon custom themes, making keyboard navigation difficult to track visually. Prefixing interactive selectors with `.gradio-container` and using `:focus-visible` with `!important` ensures consistent high-contrast focus rings for keyboard users without breaking mouse interaction visuals.
+**Action:** Always scope custom `:focus-visible` CSS rules under `.gradio-container` and apply explicit `outline` and `box-shadow` styles when building dark-themed Gradio apps.
