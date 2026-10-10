@@ -1,0 +1,3 @@
+## 2025-05-18 - Stable Diffusion Inference Optimization with Channels Last and Inference Mode
+**Learning:** PyTorch 2D convolution operations in diffusion UNet and VAE modules run faster when converting tensors and model parameters to `torch.channels_last` (NHWC layout), aligning memory access with hardware vector instructions (AVX2/AVX-512/Tensor Cores). Wrapping evaluation calls in `torch.inference_mode()` disables autograd tracking and view tracking overhead compared to `torch.no_grad()`.
+**Action:** Always apply `.to(memory_format=torch.channels_last)` to `pipe.unet` and `pipe.vae` after model loading and wrap inference calls in `with torch.inference_mode():` for Stable Diffusion pipelines.
