@@ -1,0 +1,3 @@
+## 2026-10-12 - Stable Diffusion Pipeline CPU Optimization
+**Learning:** `enable_attention_slicing()` in Stable Diffusion pipelines introduces significant sequential loop overhead on CPUs, causing major slowdowns during inference. Switching UNet/VAE to `torch.channels_last` memory format (NHWC) and wrapping generation in `torch.inference_mode()` maximizes 2D convolution execution throughput without autograd overhead.
+**Action:** Always prefer `torch.inference_mode()` and `torch.channels_last` memory format for Stable Diffusion inference on PyTorch, and avoid `enable_attention_slicing()` unless RAM is severely constrained (<4GB).
