@@ -1,8 +1,8 @@
+import time
+
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
-import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
 print("Loading Stable Diffusion v1.5...")
@@ -47,7 +47,7 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
         return image, info
 
     except Exception as e:
-        return None, f"❌ Error: {str(e)}"
+        return None, f"❌ Error: {e!s}"
 
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
@@ -154,6 +154,17 @@ input[type="range"] { accent-color: #e63946 !important; }
     background: #0f1318 !important;
     border: 1px solid rgba(230,57,70,0.12) !important;
     border-radius: 10px !important;
+}
+
+/* Keyboard Accessibility Focus Indicators */
+.gradio-container button:focus-visible,
+.gradio-container a:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container [tabindex]:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 10px rgba(230, 57, 70, 0.5) !important;
 }
 
 /* Footer */
