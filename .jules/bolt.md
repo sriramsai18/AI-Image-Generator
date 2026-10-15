@@ -1,0 +1,3 @@
+## 2026-02-27 - Attention Slicing CPU Overhead & Channels-Last Format
+**Learning:** `enable_attention_slicing()` in Diffusers is a memory-saving technique that introduces severe CPU computation overhead (slowing inference down significantly). On CPU systems with >= 4GB RAM, it should not be enabled. Furthermore, applying `torch.channels_last` memory format on UNet and VAE models and wrapping inference with `torch.inference_mode()` significantly reduces convolution overhead and autograd tracking during Stable Diffusion generation.
+**Action:** Always check system RAM before enabling attention slicing on CPU, use `channels_last` memory format for 2D diffusion models, and wrap inference with `torch.inference_mode()`.
