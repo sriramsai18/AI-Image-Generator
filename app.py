@@ -1,8 +1,8 @@
+import os
+import time
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
-import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
 print("Loading Stable Diffusion v1.5...")
@@ -15,9 +15,19 @@ pipe = StableDiffusionPipeline.from_pretrained(
 )
 pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
+# Performance optimization: Apply channels_last memory format to UNet for faster 2D convolutions
+if hasattr(pipe, "unet") and pipe.unet is not None:
+    pipe.unet.to(memory_format=torch.channels_last)
+
+# Speed optimization for CPU: Attention slicing saves VRAM/RAM but adds overhead.
+# Enable attention slicing on CPU only if RAM is under 4GB.
 if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    try:
+        total_ram = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except Exception:
+        total_ram = 0
+    if 0 < total_ram < 4 * (1024**3):
+        pipe.enable_attention_slicing()
 
 print("Model loaded ✅")
 
@@ -32,15 +42,17 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # Performance optimization: Disable autograd and runtime tensor tracking during inference
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"

@@ -1,0 +1,3 @@
+## 2026-03-31 - Stable Diffusion Pipeline Optimizations
+**Learning:** `enable_attention_slicing()` reduces memory consumption by performing attention computation in steps, but introduces significant CPU latency overhead (~150-230% slowdown) when memory is not constrained. Furthermore, wrapping PyTorch pipeline calls in `torch.inference_mode()` and applying `channels_last` memory format to UNet layers provides substantial speedups during inference without modifying output tensor accuracy.
+**Action:** Always wrap PyTorch pipeline calls with `torch.inference_mode()`, apply `channels_last` memory formatting to UNet, and conditionally restrict CPU attention slicing to low-memory environments (< 4GB RAM).
