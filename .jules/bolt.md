@@ -1,0 +1,3 @@
+## 2026-03-31 - Stable Diffusion Inference Acceleration via Inference Mode and Memory Format
+**Learning:** In PyTorch and Diffusers pipelines, un-tracked execution overhead can accumulate during multi-step diffusion sampling. Wrapping pipeline evaluation with `@torch.inference_mode()` disables autograd tracking and version counter checks completely. Additionally, converting 2D convolution heavy networks (UNet and VAE) to `torch.channels_last` memory layout optimizes memory stride and tensor access patterns for convolution kernels.
+**Action:** Always apply `channels_last` memory layout to UNet/VAE modules and wrap inference calls with `torch.inference_mode()` when deploying Stable Diffusion pipelines for CPU/CUDA inference.
