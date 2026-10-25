@@ -1,0 +1,3 @@
+## 2025-10-25 - High-Contrast Keyboard Focus Indicators in Dark-Themed Gradio UIs
+**Learning:** In dark-themed Gradio applications, default focus outlines often blend into the dark background or are overridden by internal component CSS. Explicit high-contrast `:focus-visible` styles scoped under `.gradio-container` with `!important` are required to ensure keyboard accessibility across interactive elements (buttons, text inputs, textareas, links, summary elements).
+**Action:** Always include high-contrast `:focus-visible` styles with sufficient specificity (`.gradio-container ...:focus-visible`) when writing custom Gradio themes.
