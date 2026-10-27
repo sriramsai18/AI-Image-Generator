@@ -1,0 +1,3 @@
+## 2026-10-27 - Stable Diffusion Inference Optimizations
+**Learning:** `pipe.enable_attention_slicing()` introduces severe CPU overhead (up to ~230% slowdown) and should be avoided on CPU unless RAM is extremely constrained (<4GB). Combining `torch.channels_last` memory format on UNet/VAE with `torch.inference_mode()` surrounding generation provides optimal memory throughput and disables unnecessary autograd tracking.
+**Action:** Default to `torch.channels_last` for 2D conv models in Diffusers pipelines and always wrap pipeline calls in `torch.inference_mode()`. Avoid attention slicing on CPU by default.

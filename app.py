@@ -1,7 +1,6 @@
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
 import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
@@ -15,9 +14,11 @@ pipe = StableDiffusionPipeline.from_pretrained(
 )
 pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+# Speed optimization: Channels Last memory format speeds up 2D convolutions (UNet & VAE)
+if hasattr(pipe, "unet") and pipe.unet is not None:
+    pipe.unet.to(memory_format=torch.channels_last)
+if hasattr(pipe, "vae") and pipe.vae is not None:
+    pipe.vae.to(memory_format=torch.channels_last)
 
 print("Model loaded ✅")
 
@@ -32,15 +33,17 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # Speed optimization: Disable autograd overhead during inference
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
