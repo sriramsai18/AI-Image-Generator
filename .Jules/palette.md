@@ -1,0 +1,3 @@
+## 2026-10-30 - Gradio Component Focus State Specificity
+**Learning:** Gradio's default UI component stylesheets apply aggressive `outline: none !important` rules to form inputs, textareas, and buttons. Standard tag-level `:focus` or `:focus-visible` CSS rules fail to render accessible focus indicators unless higher specificity rules (e.g., scoped under `.gradio-container`) with `!important` flags are declared.
+**Action:** Always scope `:focus-visible` styles with `.gradio-container` and use `!important` on `outline` and `box-shadow` properties when styling Gradio interfaces for keyboard accessibility.
