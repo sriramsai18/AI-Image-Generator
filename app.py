@@ -1,8 +1,8 @@
+import time
+
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
-import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
 print("Loading Stable Diffusion v1.5...")
@@ -19,9 +19,16 @@ pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 if not torch.cuda.is_available():
     pipe.enable_attention_slicing()
 
+# Optimization: convert 2D convolution layers (UNet & VAE) to channels_last memory format for faster inference
+if hasattr(pipe, "unet") and pipe.unet is not None:
+    pipe.unet.to(memory_format=torch.channels_last)
+if hasattr(pipe, "vae") and pipe.vae is not None:
+    pipe.vae.to(memory_format=torch.channels_last)
+
 print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
+@torch.inference_mode()
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
     if not prompt.strip():
         return None, "⚠️ Please enter a prompt first!"
@@ -46,8 +53,8 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
-    except Exception as e:
-        return None, f"❌ Error: {str(e)}"
+    except Exception as e:  # noqa: BLE001
+        return None, f"❌ Error: {e!s}"
 
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
