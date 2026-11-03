@@ -1,25 +1,48 @@
+import os
+import time
+from collections import namedtuple
+
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
-import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+MockResult = namedtuple("MockResult", ["images"])
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+class MockPipeline:
+    def __call__(self, *args, width=512, height=512, **kwargs):
+        img = Image.new("RGB", (int(width), int(height)), color=(20, 24, 33))
+        return MockResult(images=[img])
 
-print("Model loaded ✅")
+    def to(self, device):
+        return self
+
+    def enable_attention_slicing(self):
+        pass
+
+
+MOCK_MODE = os.environ.get("MOCK_MODE") == "1"
+
+if MOCK_MODE:
+    print("MOCK_MODE=1 detected: Using lightweight offline pipeline.")
+    pipe = MockPipeline()
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False,
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
+
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -46,8 +69,8 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
-    except Exception as e:
-        return None, f"❌ Error: {str(e)}"
+    except Exception as e:  # noqa: BLE001
+        return None, f"❌ Error: {e!s}"
 
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
@@ -110,6 +133,17 @@ textarea, input[type="text"], input[type="number"] {
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* Accessibility: High-contrast keyboard focus indicators */
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container a:focus-visible,
+.gradio-container [tabindex]:focus-visible {
+    outline: 2px solid #00f0ff !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.6) !important;
 }
 
 /* Generate button */
@@ -254,4 +288,6 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
     """)
 
 if __name__ == "__main__":
-    demo.launch()
+    server_name = os.environ.get("GRADIO_SERVER_NAME", "127.0.0.1")
+    server_port = int(os.environ.get("GRADIO_SERVER_PORT", "7860"))
+    demo.launch(server_name=server_name, server_port=server_port)
