@@ -1,25 +1,45 @@
+import os
+import time
+
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
-import time
+from PIL import Image, ImageDraw
+
+# ─── CONFIGURATION & ENVIRONMENT ──────────────────────────────────────────────
+MOCK_MODE = os.getenv("MOCK_MODE", "0").lower() in ("1", "true", "yes")
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if MOCK_MODE:
+    print("MOCK_MODE is enabled. Skipping Stable Diffusion model download and initialization.")
+    pipe = None
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False,
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    # ⚡ Performance optimization: channels_last memory format for faster 2D convolutions in UNet and VAE
+    if hasattr(pipe, "unet") and pipe.unet is not None:
+        pipe.unet.to(memory_format=torch.channels_last)
+    if hasattr(pipe, "vae") and pipe.vae is not None:
+        pipe.vae.to(memory_format=torch.channels_last)
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    # ⚡ Performance optimization: Only enable attention slicing on CPU if system memory is severely constrained (<4GB).
+    # Attention slicing introduces significant CPU sequential overhead (up to ~230% slowdown) when memory is sufficient.
+    if not torch.cuda.is_available():
+        try:
+            total_ram_gb = (os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")) / (1024**3)
+        except Exception:
+            total_ram_gb = 8.0
+        if total_ram_gb < 4.0:
+            pipe.enable_attention_slicing()
 
-print("Model loaded ✅")
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -32,22 +52,40 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+
+        if MOCK_MODE:
+            # Emulate generation delay in mock mode
+            time.sleep(0.1)
+            # Create a simple placeholder image
+            img = Image.new("RGB", (int(width), int(height)), color=(15, 19, 24))
+            draw = ImageDraw.Draw(img)
+            draw.rectangle(
+                [20, 20, int(width) - 20, int(height) - 20],
+                outline=(230, 57, 70),
+                width=4,
+            )
+            elapsed = round(time.time() - start, 1)
+            info = f"✅ [MOCK MODE] Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
+            return img, info
+
+        # ⚡ Performance optimization: torch.inference_mode() disables autograd view tracking and graph construction
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
     except Exception as e:
-        return None, f"❌ Error: {str(e)}"
+        return None, f"❌ Error: {e!s}"
 
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
@@ -171,6 +209,10 @@ input[type="range"] { accent-color: #e63946 !important; }
 .app-footer a:hover { text-decoration: underline; }
 """
 
+# Retrieve dynamic server configurations via environment variables
+server_name = os.getenv("GRADIO_SERVER_NAME", "127.0.0.1")
+server_port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+
 # ─── GRADIO UI ────────────────────────────────────────────────────────────────
 with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
 
@@ -195,7 +237,7 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                 label="NEGATIVE PROMPT  (what to avoid)",
                 placeholder="blurry, ugly, low quality, distorted...",
                 lines=2,
-                value="blurry, ugly, distorted, low quality, watermark"
+                value="blurry, ugly, distorted, low quality, watermark",
             )
 
             with gr.Accordion("⚙️ ADVANCED SETTINGS", open=False):
@@ -254,4 +296,4 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
     """)
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(server_name=server_name, server_port=server_port)
