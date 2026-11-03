@@ -1,0 +1,3 @@
+## 2026-03-02 - Gradio High-Contrast Focus-Visible Accessibility
+**Learning:** Gradio components default to `outline: none !important;` on standard interactive elements (inputs, textareas, buttons), which strips visual feedback for keyboard-only navigation, especially on dark-themed interfaces. Scoping high-contrast `:focus-visible` rules under `.gradio-container` with `!important` ensures keyboard focus states remain vivid and accessible without interfering with standard mouse clicks.
+**Action:** When working on dark-themed Gradio applications, always declare explicit `.gradio-container *:focus-visible` styles with a high-contrast outline and subtle glowing box-shadow to maintain keyboard navigation clarity.
