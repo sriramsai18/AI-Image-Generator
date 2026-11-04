@@ -1,0 +1,3 @@
+## 2026-11-04 - High-Contrast Focus Visible on Dark Cyberpunk Gradio Themes
+**Learning:** Gradio components default to subtle or hidden focus states (`outline: none !important;`) on inputs and buttons, which disappear entirely against custom dark backgrounds (#080b0f). Adding `.gradio-container [interactive]:focus-visible` with high-contrast cyan (`#00f0ff`) outlines provides unmistakable visual cues for keyboard navigation (WCAG 2.4.7) without interfering with mouse clicks.
+**Action:** When working on dark-mode Gradio UIs, always define explicit high-contrast `:focus-visible` rules with `outline-offset` scoped under `.gradio-container` with `!important` to override Gradio's internal styling resets.
