@@ -1,25 +1,49 @@
-import gradio as gr
-import torch
-from diffusers import StableDiffusionPipeline
-from PIL import Image
+import os
 import time
+from collections import namedtuple
+
+from diffusers import StableDiffusionPipeline
+import gradio as gr
+from PIL import Image
+import torch
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+MockResult = namedtuple("MockResult", ["images"])
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+class MockPipeline:
+    def __call__(self, *args, width=512, height=512, **kwargs):
+        img = Image.new("RGB", (int(width), int(height)), color=(20, 24, 33))
+        return MockResult(images=[img])
 
-print("Model loaded ✅")
+    def to(self, device):
+        return self
+
+    def enable_attention_slicing(self):
+        pass
+
+
+MOCK_MODE = os.environ.get("MOCK_MODE") == "1"
+
+if MOCK_MODE:
+    print("MOCK_MODE=1 detected: Using lightweight offline pipeline.")
+    pipe = MockPipeline()
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,  # removes NSFW filter delay
+        requires_safety_checker=False,
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
+
+    print("Model loaded ✅")
+
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -43,19 +67,60 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
         )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
-        info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
+        info = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
         return image, info
 
     except Exception as e:
-        return None, f"❌ Error: {str(e)}"
+        return None, f"❌ Error: {e!s}"
+
 
 # ─── EXAMPLE PROMPTS ──────────────────────────────────────────────────────────
 examples = [
-    ["a lone tree in a golden wheat field at sunset, dramatic lighting, 4k", "blurry, ugly, distorted", 25, 7.5, 512, 512, -1],
-    ["a futuristic cyberpunk city at night, neon lights, rain, cinematic", "blurry, low quality", 30, 8.0, 512, 512, -1],
-    ["a majestic snow-capped mountain reflected in a crystal clear lake, hyperrealistic", "cartoon, painting", 25, 7.5, 512, 512, -1],
-    ["portrait of an astronaut on Mars, dramatic lighting, photorealistic", "ugly, deformed", 28, 7.5, 512, 512, -1],
-    ["a cozy cafe interior with warm lighting and coffee cups, aesthetic", "blurry, dark", 25, 7.0, 512, 512, -1],
+    [
+        "a lone tree in a golden wheat field at sunset, dramatic lighting, 4k",
+        "blurry, ugly, distorted",
+        25,
+        7.5,
+        512,
+        512,
+        -1,
+    ],
+    [
+        "a futuristic cyberpunk city at night, neon lights, rain, cinematic",
+        "blurry, low quality",
+        30,
+        8.0,
+        512,
+        512,
+        -1,
+    ],
+    [
+        "a majestic snow-capped mountain reflected in a crystal clear lake, hyperrealistic",
+        "cartoon, painting",
+        25,
+        7.5,
+        512,
+        512,
+        -1,
+    ],
+    [
+        "portrait of an astronaut on Mars, dramatic lighting, photorealistic",
+        "ugly, deformed",
+        28,
+        7.5,
+        512,
+        512,
+        -1,
+    ],
+    [
+        "a cozy cafe interior with warm lighting and coffee cups, aesthetic",
+        "blurry, dark",
+        25,
+        7.0,
+        512,
+        512,
+        -1,
+    ],
 ]
 
 # ─── CUSTOM CSS ───────────────────────────────────────────────────────────────
@@ -110,6 +175,17 @@ textarea, input[type="text"], input[type="number"] {
 textarea:focus, input:focus {
     border-color: #e63946 !important;
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
+}
+
+/* Accessibility: High-contrast keyboard focus indicators */
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container a:focus-visible,
+.gradio-container [tabindex]:focus-visible {
+    outline: 2px solid #00f0ff !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.6) !important;
 }
 
 /* Generate button */
@@ -173,7 +249,6 @@ input[type="range"] { accent-color: #e63946 !important; }
 
 # ─── GRADIO UI ────────────────────────────────────────────────────────────────
 with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
-
     gr.HTML("""
     <div class="app-header">
         <div class="app-title">TEXT <span>2</span> IMAGE</div>
@@ -182,10 +257,8 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
     """)
 
     with gr.Row():
-
         # ── LEFT: Controls ──────────────────────────────────────────────────
         with gr.Column(scale=1):
-
             prompt = gr.Textbox(
                 label="PROMPT",
                 placeholder="describe what you want to generate...",
@@ -195,23 +268,41 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                 label="NEGATIVE PROMPT  (what to avoid)",
                 placeholder="blurry, ugly, low quality, distorted...",
                 lines=2,
-                value="blurry, ugly, distorted, low quality, watermark"
+                value="blurry, ugly, distorted, low quality, watermark",
             )
 
             with gr.Accordion("⚙️ ADVANCED SETTINGS", open=False):
                 with gr.Row():
-                    steps    = gr.Slider(10, 50, value=25, step=1,   label="INFERENCE STEPS")
-                    guidance = gr.Slider(1,  20, value=7.5, step=0.5, label="GUIDANCE SCALE (CFG)")
+                    steps = gr.Slider(
+                        10, 50, value=25, step=1, label="INFERENCE STEPS"
+                    )
+                    guidance = gr.Slider(
+                        1, 20, value=7.5, step=0.5, label="GUIDANCE SCALE (CFG)"
+                    )
                 with gr.Row():
-                    width  = gr.Slider(256, 768, value=512, step=64, label="WIDTH (px)")
-                    height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
+                    width = gr.Slider(
+                        256, 768, value=512, step=64, label="WIDTH (px)"
+                    )
+                    height = gr.Slider(
+                        256, 768, value=512, step=64, label="HEIGHT (px)"
+                    )
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            generate_btn = gr.Button(
+                "▶ GENERATE IMAGE", variant="primary", size="lg"
+            )
 
             gr.Examples(
                 examples=examples,
-                inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
+                inputs=[
+                    prompt,
+                    negative_prompt,
+                    steps,
+                    guidance,
+                    width,
+                    height,
+                    seed,
+                ],
                 label="💡 EXAMPLE PROMPTS — click to load",
                 examples_per_page=5,
             )
@@ -245,13 +336,15 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
 
     gr.HTML("""
     <div class="app-footer">
-        Built by <a href="https://github.com/sriramsai18" target="_blank">Sriram Sai Laggisetti</a>
+        Built by <a href="https://github.com/sriramsai18" target="_blank" rel="noopener noreferrer">Sriram Sai Laggisetti</a>
         &nbsp;·&nbsp;
-        Model: <a href="https://huggingface.co/runwayml/stable-diffusion-v1-5" target="_blank">runwayml/stable-diffusion-v1-5</a>
+        Model: <a href="https://huggingface.co/runwayml/stable-diffusion-v1-5" target="_blank" rel="noopener noreferrer">runwayml/stable-diffusion-v1-5</a>
         &nbsp;·&nbsp;
-        <a href="https://www.linkedin.com/in/sriram-sai-laggisetti/" target="_blank">LinkedIn</a>
+        <a href="https://www.linkedin.com/in/sriram-sai-laggisetti/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
     </div>
     """)
 
 if __name__ == "__main__":
-    demo.launch()
+    server_name = os.environ.get("GRADIO_SERVER_NAME", "127.0.0.1")
+    server_port = int(os.environ.get("GRADIO_SERVER_PORT", "7860"))
+    demo.launch(server_name=server_name, server_port=server_port)
