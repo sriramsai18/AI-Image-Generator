@@ -1,0 +1,3 @@
+## 2026-11-07 - Accessible High-Contrast Focus Visible States in Gradio Cyberpunk Themes
+**Learning:** Dark/cyberpunk customized Gradio interfaces often obscure or remove default browser focus outlines, hindering keyboard accessibility. Targeting `:focus-visible` with higher specificity scoped to `.gradio-container` with neon accent outlines and glows provides clear keyboard navigation feedback without interfering with mouse clicks.
+**Action:** When customizing dark Gradio themes, always add explicit `.gradio-container *:focus-visible` styles with theme-matching high-contrast outline and glow.

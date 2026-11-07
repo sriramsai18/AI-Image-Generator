@@ -112,7 +112,17 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
-/* Generate button */
+/* Accessibility & Focus-Visible States */
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container a:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 14px rgba(230,57,70,0.6) !important;
+}
+
+/* Buttons */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
     border: none !important;
@@ -128,6 +138,22 @@ button.primary {
 button.primary:hover {
     box-shadow: 0 0 35px rgba(230,57,70,0.6) !important;
     transform: translateY(-2px) !important;
+}
+button.secondary {
+    background: #0f1318 !important;
+    border: 1px solid rgba(230,57,70,0.35) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #d4dde8 !important;
+    transition: all 0.3s !important;
+}
+button.secondary:hover {
+    border-color: #e63946 !important;
+    color: #fff !important;
+    box-shadow: 0 0 15px rgba(230,57,70,0.3) !important;
 }
 
 /* Output image panel */
@@ -207,7 +233,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                reset_btn = gr.Button("↺ RESET", variant="secondary", size="lg")
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
 
             gr.Examples(
                 examples=examples,
@@ -232,6 +260,15 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
             )
 
     # ── BIND ────────────────────────────────────────────────────────────────
+    def reset_inputs():
+        default_neg = "blurry, ugly, distorted, low quality, watermark"
+        return "", default_neg, 25, 7.5, 512, 512, -1, None, ""
+
+    reset_btn.click(
+        fn=reset_inputs,
+        inputs=[],
+        outputs=[prompt, negative_prompt, steps, guidance, width, height, seed, output_image, info_text],
+    )
     generate_btn.click(
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
