@@ -1,0 +1,3 @@
+## 2026-02-27 - Gradio Keyboard Focus & Dark Theme Micro-UX
+**Learning:** In custom dark-themed Gradio applications, default browser focus rings either disappear or get masked by inner component CSS resets, leading to poor keyboard navigation accessibility. Furthermore, adding high-contrast `:focus-visible` styles scoped to `.gradio-container` paired with a dedicated micro-UX secondary reset action gives power users full keyboard controllability and instant field restoration without having to manually backspace inputs.
+**Action:** When working on Gradio interfaces, declare high-specificity `.gradio-container *:focus-visible` styles with glowing accent outlines and include secondary utility controls alongside primary CTA buttons.

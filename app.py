@@ -112,6 +112,35 @@ textarea:focus, input:focus {
     box-shadow: 0 0 12px rgba(230,57,70,0.2) !important;
 }
 
+/* Keyboard accessibility focus indicators */
+.gradio-container button:focus-visible,
+.gradio-container input:focus-visible,
+.gradio-container textarea:focus-visible,
+.gradio-container a:focus-visible {
+    outline: 2px solid #e63946 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 14px rgba(230,57,70,0.5) !important;
+}
+
+/* Secondary reset button */
+button.secondary-btn {
+    background: #14181f !important;
+    border: 1px solid rgba(230,57,70,0.3) !important;
+    border-radius: 6px !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.85rem !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #8a9ab0 !important;
+    transition: all 0.2s ease !important;
+}
+button.secondary-btn:hover {
+    background: #1c232d !important;
+    border-color: #e63946 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 15px rgba(230,57,70,0.25) !important;
+}
+
 /* Generate button */
 button.primary {
     background: linear-gradient(135deg, #e63946, #c1121f) !important;
@@ -207,7 +236,9 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
                     height = gr.Slider(256, 768, value=512, step=64, label="HEIGHT (px)")
                 seed = gr.Number(value=-1, label="SEED  (-1 = random)")
 
-            generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg")
+            with gr.Row():
+                generate_btn = gr.Button("▶ GENERATE IMAGE", variant="primary", size="lg", scale=3)
+                reset_btn = gr.Button("↺ RESET", elem_classes=["secondary-btn"], size="lg", scale=1)
 
             gr.Examples(
                 examples=examples,
@@ -241,6 +272,11 @@ with gr.Blocks(css=css, title="Text2Image — Sriram") as demo:
         fn=generate_image,
         inputs=[prompt, negative_prompt, steps, guidance, width, height, seed],
         outputs=[output_image, info_text],
+    )
+    reset_btn.click(
+        fn=lambda: ("", "blurry, ugly, distorted, low quality, watermark", 25, 7.5, 512, 512, -1, None, ""),
+        inputs=None,
+        outputs=[prompt, negative_prompt, steps, guidance, width, height, seed, output_image, info_text],
     )
 
     gr.HTML("""
