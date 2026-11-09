@@ -1,0 +1,3 @@
+## 2026-02-27 - Channels-Last Memory Format and Inference Mode in Stable Diffusion
+**Learning:** PyTorch models heavily reliant on 2D convolutions (like Stable Diffusion's UNet and VAE) achieve significantly higher compute throughput and lower memory access latency when converted to `torch.channels_last` (NHWC memory layout). Furthermore, wrapping inference in `torch.inference_mode()` disables tracking and view version counters, shaving dispatch overhead off each step.
+**Action:** Always convert UNet and VAE to `torch.channels_last` and execute generation passes under `torch.inference_mode()`.
