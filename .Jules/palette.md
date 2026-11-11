@@ -1,0 +1,3 @@
+## 2025-05-18 - High-contrast keyboard focus indicators in Gradio dark themes
+**Learning:** Gradio dark themes can render interactive element focus outlines nearly invisible against dark backgrounds (e.g., `#101010` on `#080b0f`), violating WCAG 2.4.7 focus visibility for keyboard users. Applying `:focus-visible` with a high-contrast accent outline (such as cyan `#00f0ff` with outline-offset and subtle glowing box-shadow) scoped to `.gradio-container` restores clear accessibility indicators without altering mouse click states.
+**Action:** When designing or auditing dark-themed Gradio apps, always inspect keyboard Tab navigation and explicitly define high-contrast `:focus-visible` styles on interactive elements (`button`, `a`, `input`, `textarea`, `[role="button"]`).
