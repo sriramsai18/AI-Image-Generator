@@ -1,25 +1,34 @@
+import os
+import time
 import gradio as gr
 import torch
 from diffusers import StableDiffusionPipeline
-from PIL import Image
-import time
 
 # ─── MODEL LOAD ───────────────────────────────────────────────────────────────
-print("Loading Stable Diffusion v1.5...")
+if os.environ.get("MOCK_MODE") == "1":
+    print("MOCK_MODE enabled: Skipping model download for lightweight testing/dev.")
+    pipe = None
+else:
+    print("Loading Stable Diffusion v1.5...")
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        safety_checker=None,          # removes NSFW filter delay
+        requires_safety_checker=False,
+    )
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
 
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-    safety_checker=None,          # removes NSFW filter delay
-    requires_safety_checker=False
-)
-pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    # Memory layout optimization: channels_last yields faster 2D convolutions in UNet and VAE
+    if hasattr(pipe, "unet") and pipe.unet is not None:
+        pipe.unet.to(memory_format=torch.channels_last)
+    if hasattr(pipe, "vae") and pipe.vae is not None:
+        pipe.vae.to(memory_format=torch.channels_last)
 
-# speed optimisation for CPU
-if not torch.cuda.is_available():
-    pipe.enable_attention_slicing()
+    # speed optimisation for CPU
+    if not torch.cuda.is_available():
+        pipe.enable_attention_slicing()
 
-print("Model loaded ✅")
+    print("Model loaded ✅")
 
 # ─── GENERATION FUNCTION ──────────────────────────────────────────────────────
 def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed):
@@ -32,15 +41,18 @@ def generate_image(prompt, negative_prompt, steps, guidance, width, height, seed
 
     try:
         start = time.time()
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt if negative_prompt.strip() else None,
-            num_inference_steps=int(steps),
-            guidance_scale=float(guidance),
-            width=int(width),
-            height=int(height),
-            generator=generator,
-        )
+        # Optimization: torch.inference_mode() disables view tracking and version counter
+        # bumps, reducing runtime overhead and memory consumption compared to standard inference.
+        with torch.inference_mode():
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt.strip() else None,
+                num_inference_steps=int(steps),
+                guidance_scale=float(guidance),
+                width=int(width),
+                height=int(height),
+                generator=generator,
+            )
         elapsed = round(time.time() - start, 1)
         image = result.images[0]
         info  = f"✅ Generated in {elapsed}s  |  Steps: {steps}  |  CFG: {guidance}  |  Seed: {seed if seed != -1 else 'random'}"
